@@ -1,6 +1,6 @@
 import numpy as np
-from segmentation_tools import check_ndimage, check_seeds, get_neighbors, timeit_context
-
+from segmentation_tools import check_ndimage, check_seeds, get_neighbors
+from timeit_context import timeit_context
 
 class RegionGrowing(object):
     def __init__(self, image, seeds, sigma=1):
@@ -68,7 +68,7 @@ class RegionGrowing(object):
 
         count = 0
 
-        with timeit_context('Region Growing'):
+        with timeit_context('Region Growing inner loop'):
             while len(queue) > 0:
                 curr_pos = queue[0]
                 queue = queue[1:]

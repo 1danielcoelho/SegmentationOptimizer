@@ -4,6 +4,8 @@ import matplotlib.colors as colors
 from copy import copy
 
 from open import *
+from timeit_context import timeit_context
+from profile_func import profile_this
 from region_growing import RegionGrowing
 
 
@@ -57,6 +59,7 @@ def main():
 
     algorithm = RegionGrowing(series_arr, seeds, sigma=7)
     incremental_plot_seg(algo=algorithm)
+
 
 if __name__ == '__main__':
     main()
