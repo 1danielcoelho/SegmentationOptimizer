@@ -2,12 +2,13 @@ import numpy as np
 from segmentation_tools import check_ndimage, check_seeds, get_neighbors
 from timeit_context import timeit_context
 
+
 class RegionGrowing(object):
-    def __init__(self, image, seeds, sigma=1):
+    def __init__(self, image, seeds, sigma=1, num_loops_to_yield=100):
         self.image = image
         self.seeds = seeds
         self.sigma = sigma
-        self.num_loops_to_yield = 100
+        self.num_loops_to_yield = num_loops_to_yield
 
     def __call__(self, *args, **kwargs):
         # Sanitize inputs
@@ -60,7 +61,7 @@ class RegionGrowing(object):
         seg_average = np.mean(base_samples)
         tolerance = self.sigma * max(np.std(base_samples), 1)
 
-        print("Segment values is " + str(seg_average) + " +/- " + str(tolerance))
+        print("Segment value is " + str(seg_average) + " +/- " + str(tolerance))
 
         for s in self.seeds:
             queue.append(s)
