@@ -1,5 +1,5 @@
 import numpy as np
-from segmentation_tools import check_ndimage, check_seeds, get_neighbors
+from segmentation_tools import check_ndimage, check_seeds, get_neighbors, padding_value
 from timeit_context import timeit_context
 
 
@@ -10,7 +10,7 @@ class RegionGrowing(object):
         self.sigma = sigma
         self.num_loops_to_yield = num_loops_to_yield
 
-    def __call__(self, *args, **kwargs):
+    def run(self):
         # Sanitize inputs
         try:
             check_seeds(self.seeds)
@@ -19,7 +19,6 @@ class RegionGrowing(object):
             raise  # raises last exception
 
         # Pad image and offset seeds
-        padding_value = np.iinfo(np.int32).min + 1
         padded = np.lib.pad(self.image, 1, 'constant', constant_values=padding_value)
         self.seeds += np.array([1, 1, 1])
 
@@ -67,8 +66,7 @@ class RegionGrowing(object):
             queue.append(s)
             explored[tuple(s)] = True
 
-        count = 0
-
+        itercount = 0
         with timeit_context('Region Growing inner loop'):
             while len(queue) > 0:
                 curr_pos = queue[0]
@@ -93,7 +91,9 @@ class RegionGrowing(object):
                         seg[tn] = True
                         queue.append(n)
 
-                count += 1
-                if count % self.num_loops_to_yield == 0:
+                itercount += 1
+                if itercount % self.num_loops_to_yield == 0:
                     yield seg[1:-1, 1:-1, 1:-1]
+
+        yield seg[1:-1, 1:-1, 1:-1]
 
