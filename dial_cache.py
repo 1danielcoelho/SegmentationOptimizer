@@ -2,7 +2,7 @@ import numpy as np
 
 
 class DialCache(object):
-    max_index = np.iinfo(np.uint16).max  # 65535
+    max_index = 65535
 
     def __init__(self):
         self.largest_affinity = 0  # [0, max_index] affinity value
@@ -64,16 +64,15 @@ class DialCache(object):
         :return: None
         """
         new_affinity = int(round(new_affinity * DialCache.max_index))
-
-        # Remove old
         old_affinity = self.pointer_array[spel_pos]
 
-        tempy = self.main_list[old_affinity]
-        self.main_list[old_affinity].remove(spel_pos)
+        if old_affinity == new_affinity:
+            return
 
-        # Add new
-        self.pointer_array[spel_pos] = new_affinity
+        self.main_list[old_affinity].remove(spel_pos)
         self.main_list[new_affinity].append(spel_pos)
+
+        self.pointer_array[spel_pos] = new_affinity
 
         # We only ever update upwards: No need to check if largest_affinity decreased
         self.largest_affinity = max(self.largest_affinity, new_affinity)
