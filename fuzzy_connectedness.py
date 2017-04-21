@@ -1,6 +1,6 @@
 import numpy as np
 from itertools import combinations
-from segmentation_tools import check_ndimage, check_seeds, get_neighbors, neighborhood_mu_sigma
+from segmentation_tools import check_ndimage, check_seeds, get_neighbors
 from dial_cache import DialCache
 from timeit_context import timeit_context
 

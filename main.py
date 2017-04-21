@@ -6,6 +6,7 @@ from copy import copy
 from open import dicom_datasets_to_numpy, load_dicom_folder
 from region_growing import RegionGrowing
 from fuzzy_connectedness import FuzzyConnectedness
+from level_sets import LevelSets
 from profile_func import profile_func
 
 
@@ -48,6 +49,7 @@ def incremental_plot_seg(algo, image_slice=0):
 
         seg_img.set_data(masked_seg_slice)
         fig1.canvas.draw()
+        plt.pause(0.05)
 
     plt.show(block=True)
 
@@ -70,11 +72,21 @@ def test_fuzzy_connectedness():
     incremental_plot_seg(algo=algorithm, image_slice=0)
 
 
+def test_level_sets():
+    datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
+    series_arr, _ = dicom_datasets_to_numpy(datasets)
+
+    algorithm = LevelSets(series_arr)
+    algorithm.run()
+    # incremental_plot_seg(algo=algorithm, image_slice=0)
+
+
 # @profile_func
 def main():
     # np.seterr(all='raise')
-    test_fuzzy_connectedness()
-    test_region_growing()
+    # test_fuzzy_connectedness()
+    # test_region_growing()
+    test_level_sets()
 
 
 if __name__ == '__main__':
