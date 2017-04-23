@@ -17,13 +17,13 @@ def edge_indicator1(i, sigma):
     :return: 3d ndarray of floats of the same shape as 'i'
     """
     filtered = fi.gaussian_gradient_magnitude(i, sigma)
-    return 1.0 / (1.0 + filtered)
+    return 1.0 / (1.0 + filtered**2)
 
 
 def edge_indicator2(i, sigma):
     """
     Function that highlights (with low values) sharp transitions in 'i'. Corresponds to:
-        g(i) = 1 / (1 + abs(mag_gradient(gaussian_filter(i))))
+        g(i) = 1 / (1 + abs(mag_gradient(gaussian_filter(i)))^2)
     :param i: 3d ndarray of floats
     :param sigma: float
     :return: 3d ndarray of floats of the same shape as 'i'
@@ -31,7 +31,7 @@ def edge_indicator2(i, sigma):
     filtered = fi.gaussian_filter(i, sigma)
     grad = np.gradient(filtered)
     mag_grad = np.sqrt(grad[0] ** 2 + grad[1] ** 2 + grad[2] ** 2)
-    return 1.0 / (1.0 + mag_grad)
+    return 1.0 / (1.0 + mag_grad**2)
 
 
 def delta_operator(x, epsilon):
@@ -45,19 +45,16 @@ def delta_operator(x, epsilon):
     """
     const1 = 1.0 / (2.0 * epsilon)
     const2 = np.pi / epsilon
-
-    kill_mask = (abs(x) > epsilon)
-    modify_mask = ~kill_mask
+    modify_mask = abs(x) <= epsilon
 
     res = np.zeros(x.shape, dtype=np.float64)
-    res[kill_mask] = 0
-    res[modify_mask] = const1 * (1 + np.cos(const2 * res[modify_mask]))
+    res[modify_mask] = const1 * (1 + np.cos(const2 * x[modify_mask]))
     return res
 
 
 def dp(s):
     """
-    Corresponds to d_p2(s) = p2'(s)/s. To avoid nans, this function is split into three:
+    Corresponds to d_p2(s) = p2'(s)/s. To avoid NANs, this function is split into three:
         dp(s) = 1, if s = 0
         dp(s) = (1/(2pi*s) * sin(2pi*s), if 0 < s < 1
         dp(s) = 1 - 1/s, if s >= 1
@@ -73,13 +70,15 @@ def dp(s):
     return res
 
 
-def div(img):
+def divergence(f):
     """
-    Divergence operator, to be applied to a gradient
-    :param img: 3 x 3d array of floats (img[0] is the x component, img[1] the y component, etc)
-    :return: 3d array of floats
+    Calculates the divergence of n-D scalar field f
+    :param f: 
+    :return: 
     """
-    return img[0] + img[1] + img[2]
+
+    this is wrong
+    return np.ufunc.reduce(np.add, np.gradient(f))
 
 
 class LevelSets(object):
@@ -105,16 +104,16 @@ class LevelSets(object):
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
         g = edge_indicator2(self.image, self.sigma)
 
+        quick_plot(g[:, :, 1])
+
         max_iter = 100
         for i in range(max_iter):
             grad = np.gradient(self.image)
             mag_grad = np.sqrt(grad[0] ** 2 + grad[1] ** 2 + grad[2] ** 2)
             delta = delta_operator(self.phi, self.epsilon)
 
-            quick_plot(mag_grad[:, :, 1])
-
-            l = self.mu * div(dp(mag_grad) * grad) + \
-                self.lamb * delta * div(g * grad/mag_grad) + \
+            l = self.mu * divergence(dp(mag_grad) * grad) + \
+                self.lamb * delta * divergence(g * grad/mag_grad) + \
                 self.alpha * g * delta
 
             self.phi += self.delta_t * l
