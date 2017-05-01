@@ -79,6 +79,18 @@ def divergence(f):
     return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
 
+def cmask(array, center, radius, inside, outside):
+    a, b = center
+    nx, ny = array.shape
+    y, x = np.ogrid[-a:nx-a, -b:ny-b]
+    mask = x*x + y*y <= radius*radius
+
+    array[~mask] = outside
+    array[mask] = inside
+
+    return array
+
+
 class LevelSets(object):
     def __init__(self, image, alpha=1.0, lamb=1.0, mu=1.0, sigma=2.0, epsilon=1.5, delta_t=1.0, num_loops_to_yield=100):
         self.image = image
@@ -102,13 +114,14 @@ class LevelSets(object):
             raise  # raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
+        self.phi = cmask(self.phi, (120, 120), 80, 20, -20)
         g = edge_indicator2(self.image, self.sigma)
 
         max_iter = 100
         for i in range(max_iter):
             grad = np.gradient(self.phi)
             mag_grad = magnitude_of_gradient(grad)
-            mag_grad = mag_grad.clip(0.0001)  # Set min possible value of mag_grad to 0.0001
+            mag_grad = mag_grad.clip(0.0000001)
             delta = delta_operator(self.phi, self.epsilon)
 
             l = self.mu * divergence(dp(mag_grad) * grad) + \
