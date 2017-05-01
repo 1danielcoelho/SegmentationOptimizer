@@ -30,7 +30,7 @@ def edge_indicator2(i, sigma):
     """
     filtered = fi.gaussian_filter(i, sigma)
     grad = np.gradient(filtered)
-    mag_grad = np.sqrt(grad[0] ** 2 + grad[1] ** 2 + grad[2] ** 2)
+    mag_grad = magnitude_of_gradient(grad)
     return 1.0 / (1.0 + mag_grad**2)
 
 
@@ -70,15 +70,13 @@ def dp(s):
     return res
 
 
-def divergence(f):
-    """
-    Calculates the divergence of n-D scalar field f
-    :param f: 
-    :return: 
-    """
+def magnitude_of_gradient(grad_f):
+    return np.sqrt(np.ufunc.reduce(np.add, [x**2 for x in grad_f]))
 
-    this is wrong
-    return np.ufunc.reduce(np.add, np.gradient(f))
+
+def divergence(f):
+    num_dims = len(f)
+    return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
 
 class LevelSets(object):
@@ -95,6 +93,8 @@ class LevelSets(object):
         self.num_loops_to_yield = num_loops_to_yield
 
     def run(self):
+        self.image = self.image[:, :, 1]
+
         # Sanitize inputs
         try:
             check_ndimage(self.image)
@@ -104,12 +104,11 @@ class LevelSets(object):
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
         g = edge_indicator2(self.image, self.sigma)
 
-        quick_plot(g[:, :, 1])
-
         max_iter = 100
         for i in range(max_iter):
-            grad = np.gradient(self.image)
-            mag_grad = np.sqrt(grad[0] ** 2 + grad[1] ** 2 + grad[2] ** 2)
+            grad = np.gradient(self.phi)
+            mag_grad = magnitude_of_gradient(grad)
+            mag_grad = mag_grad.clip(0.0001)  # Set min possible value of mag_grad to 0.0001
             delta = delta_operator(self.phi, self.epsilon)
 
             l = self.mu * divergence(dp(mag_grad) * grad) + \
@@ -118,4 +117,4 @@ class LevelSets(object):
 
             self.phi += self.delta_t * l
 
-        quick_plot(self.phi[:, :, 1])
+        quick_plot(self.phi)
