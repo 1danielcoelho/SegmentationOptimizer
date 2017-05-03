@@ -11,13 +11,14 @@ twenty_six_neighbor_deltas = np.array([(-1, -1, -1), (-1, -1, 0), (-1, -1, 1), (
 padding_value = np.iinfo(np.int32).min + 1
 
 
-def quick_plot(ndimage):
+def quick_plot(ndimage, title=""):
     fig1 = plt.figure()
     plt.set_cmap(plt.gray())  # Set grayscale color palette as default
 
     ax = fig1.add_subplot(111)
     ax.set_aspect('equal', 'datalim')
     img = ax.imshow(ndimage, interpolation='nearest', origin='bottom')
+    plt.title(title)
     plt.colorbar(img, ax=ax)
     plt.show(block=True)
 

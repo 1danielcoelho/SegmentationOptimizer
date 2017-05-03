@@ -71,10 +71,20 @@ def dp(s):
 
 
 def magnitude_of_gradient(grad_f):
+    """
+    Applies Pythagoras' theorem to find the magnitude of every point of the gradient
+    :param grad_f: List of ndarrays, where every item of the list is one axis of the gradient
+    :return: Single ndarray of the same shape as each of the items in the grad_f list
+    """
     return np.sqrt(np.ufunc.reduce(np.add, [x**2 for x in grad_f]))
 
 
 def divergence(f):
+    """
+    Computes the divergence of the vector field f, corresponding to dFx/dx + dFy/dy + ...
+    :param f: List of ndarrays, where every item of the list is one dimension of the vector field
+    :return: Single ndarray of the same shape as each of the items in f, which corresponds to a scalar field
+    """
     num_dims = len(f)
     return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
@@ -92,7 +102,7 @@ def cmask(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=1.0, lamb=1.0, mu=1.0, sigma=2.0, epsilon=1.5, delta_t=1.0, num_loops_to_yield=100):
+    def __init__(self, image, alpha=-1.0, lamb=5.0, mu=0.04, sigma=5.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=100):
         self.image = image
         self.phi = None
 
@@ -111,11 +121,11 @@ class LevelSets(object):
         try:
             check_ndimage(self.image)
         except:
-            raise  # raises last exception
+            raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = cmask(self.phi, (120, 120), 80, 20, -20)
-        g = edge_indicator2(self.image, self.sigma)
+        self.phi = cmask(self.phi, (120, 120), 80, 10, -10)
+        g = edge_indicator1(self.image, self.sigma)
 
         max_iter = 100
         for i in range(max_iter):
@@ -124,10 +134,15 @@ class LevelSets(object):
             mag_grad = mag_grad.clip(0.0000001)
             delta = delta_operator(self.phi, self.epsilon)
 
-            l = self.mu * divergence(dp(mag_grad) * grad) + \
-                self.lamb * delta * divergence(g * grad/mag_grad) + \
-                self.alpha * g * delta
+            R = self.mu * divergence(dp(mag_grad) * grad)
+            L = self.lamb * delta * divergence(g * grad/mag_grad)
+            A = self.alpha * g * delta
 
-            self.phi += self.delta_t * l
+            # quick_plot(delta, "delta")
+            # quick_plot(R, "R")
+            # quick_plot(L, "L")
+            # quick_plot(A, "A")
+
+            self.phi += self.delta_t * (R + L + A)
 
         quick_plot(self.phi)
