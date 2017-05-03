@@ -44,7 +44,10 @@ def incremental_plot_seg(algo, image_slice=0):
     plt.show(block=False)
 
     for t in algo.run():
-        seg_slice = t[:, :, image_slice]
+        if t.ndim == 3:
+            seg_slice = t[:, :, image_slice]
+        else:
+            seg_slice = t[:, :]
         masked_seg_slice = np.ma.masked_where(seg_slice == 0, seg_slice)  # Hide spels where condition is true
 
         seg_img.set_data(masked_seg_slice)
@@ -77,8 +80,8 @@ def test_level_sets():
     series_arr, _ = dicom_datasets_to_numpy(datasets)
 
     algorithm = LevelSets(series_arr)
-    algorithm.run()
-    # incremental_plot_seg(algo=algorithm, image_slice=0)
+    # algorithm.run()
+    incremental_plot_seg(algo=algorithm, image_slice=0)
 
 
 # @profile_func

@@ -102,7 +102,7 @@ def cmask(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=-1.0, lamb=5.0, mu=0.04, sigma=5.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=100):
+    def __init__(self, image, alpha=30.0, lamb=5.0, mu=0.04, sigma=1.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=3):
         self.image = image
         self.phi = None
 
@@ -124,10 +124,10 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = cmask(self.phi, (120, 120), 80, 10, -10)
+        self.phi = cmask(self.phi, (100, 100), 5, 2, -2)
         g = edge_indicator1(self.image, self.sigma)
 
-        max_iter = 100
+        max_iter = 500
         for i in range(max_iter):
             grad = np.gradient(self.phi)
             mag_grad = magnitude_of_gradient(grad)
@@ -145,4 +145,9 @@ class LevelSets(object):
 
             self.phi += self.delta_t * (R + L + A)
 
-        quick_plot(self.phi)
+            # quick_plot(self.phi)
+
+            if i % self.num_loops_to_yield == 0:
+                yield self.phi
+
+        yield self.phi
