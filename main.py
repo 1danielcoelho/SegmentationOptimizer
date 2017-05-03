@@ -26,7 +26,12 @@ def incremental_plot_seg(algo, image_slice=0):
     seg_slice = np.zeros([algo.image.shape[0], algo.image.shape[1]], dtype=np.float32)
     masked_seg_slice = np.ma.masked_where(seg_slice == 0, seg_slice)  # Hide spels where condition is true
 
-    series_img = ax.imshow(algo.image[:, :, image_slice], interpolation='nearest', origin='bottom')
+    if algo.image.ndim == 2:
+        series_pix = algo.image
+    else:
+        series_pix = algo.image[:, :, image_slice]
+
+    series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
     seg_img = ax.imshow(masked_seg_slice,
                         interpolation='nearest',
                         origin='bottom',
@@ -47,12 +52,12 @@ def incremental_plot_seg(algo, image_slice=0):
         if t.ndim == 3:
             seg_slice = t[:, :, image_slice]
         else:
-            seg_slice = t[:, :]
+            seg_slice = t
         masked_seg_slice = np.ma.masked_where(seg_slice == 0, seg_slice)  # Hide spels where condition is true
 
         seg_img.set_data(masked_seg_slice)
         fig1.canvas.draw()
-        plt.pause(0.05)
+        plt.pause(0.001)
 
     plt.show(block=True)
 
@@ -81,7 +86,7 @@ def test_level_sets():
 
     algorithm = LevelSets(series_arr)
     # algorithm.run()
-    incremental_plot_seg(algo=algorithm, image_slice=0)
+    incremental_plot_seg(algo=algorithm, image_slice=4)
 
 
 # @profile_func

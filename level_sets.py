@@ -89,11 +89,19 @@ def divergence(f):
     return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
 
-def cmask(array, center, radius, inside, outside):
-    a, b = center
-    nx, ny = array.shape
-    y, x = np.ogrid[-a:nx-a, -b:ny-b]
-    mask = x*x + y*y <= radius*radius
+def circle_mask(array, center, radius, inside, outside):
+    a, b, c = center
+    mask = []
+
+    if array.ndim == 2:
+        nx, ny = array.shape
+        y, x = np.ogrid[-a:nx - a, -b:ny - b]
+        mask = x * x + y * y <= radius * radius
+
+    elif array.ndim == 3:
+        nx, ny, nz = array.shape
+        z, y, x = np.ogrid[-a:nx - a, -b:ny - b, -c:nz - c]
+        mask = x * x + y * y + z * z <= radius * radius
 
     array[~mask] = outside
     array[mask] = inside
@@ -102,7 +110,7 @@ def cmask(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=30.0, lamb=5.0, mu=0.04, sigma=1.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=3):
+    def __init__(self, image, alpha=10.0, lamb=3.0, mu=0.04, sigma=1.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=3):
         self.image = image
         self.phi = None
 
@@ -115,7 +123,7 @@ class LevelSets(object):
         self.num_loops_to_yield = num_loops_to_yield
 
     def run(self):
-        self.image = self.image[:, :, 1]
+        self.image = self.image[:, :, 4]
 
         # Sanitize inputs
         try:
@@ -124,10 +132,10 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = cmask(self.phi, (100, 100), 5, 2, -2)
+        self.phi = circle_mask(self.phi, center=(100, 100, 5), radius=10, inside=2, outside=-2)
         g = edge_indicator1(self.image, self.sigma)
 
-        max_iter = 500
+        max_iter = 300
         for i in range(max_iter):
             grad = np.gradient(self.phi)
             mag_grad = magnitude_of_gradient(grad)
