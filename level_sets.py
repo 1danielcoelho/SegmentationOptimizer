@@ -89,7 +89,7 @@ def divergence(f):
     return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
 
-def circle_mask(array, center, radius, inside, outside):
+def draw_circle(array, center, radius, inside, outside):
     a, b, c = center
     mask = []
 
@@ -110,7 +110,7 @@ def circle_mask(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=10.0, lamb=3.0, mu=0.04, sigma=1.0, epsilon=1.5, delta_t=5.0, num_loops_to_yield=3):
+    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=3):
         self.image = image
         self.phi = None
 
@@ -132,14 +132,14 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = circle_mask(self.phi, center=(100, 100, 5), radius=10, inside=2, outside=-2)
+        self.phi = draw_circle(self.phi, center=(100, 100, 5), radius=10, inside=2, outside=-2)
         g = edge_indicator1(self.image, self.sigma)
 
-        max_iter = 300
+        max_iter = 400
         for i in range(max_iter):
             grad = np.gradient(self.phi)
             mag_grad = magnitude_of_gradient(grad)
-            mag_grad = mag_grad.clip(0.0000001)
+            mag_grad = mag_grad.clip(0.0000001)  # Clip the smallest value of mag_grad to this, to avoid div/0
             delta = delta_operator(self.phi, self.epsilon)
 
             R = self.mu * divergence(dp(mag_grad) * grad)

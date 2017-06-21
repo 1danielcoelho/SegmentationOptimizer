@@ -137,7 +137,17 @@ def test_level_sets():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
 
-    algorithm = LevelSets(series_arr)
+    other_arr = copy(series_arr)
+    other_arr[:] = 0
+
+    (width, height, depth) = other_arr.shape
+    for x in range(width):
+        for y in range(height):
+            for z in range(depth):
+                if x > 80 and x < 150 and y > 80 and y < 120:
+                    other_arr[x, y, z] = 100
+
+    algorithm = LevelSets(other_arr)
     # algorithm.run()
     # incremental_plot_seg(algo=algorithm, image_slice=10)
     incremental_plot_level_sets(algorithm=algorithm, image_slice=0)
