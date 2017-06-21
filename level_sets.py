@@ -2,10 +2,12 @@ import numpy as np
 import scipy.ndimage.filters as fi
 import scipy.stats as st
 import scipy.signal as sg
+import scipy.ndimage as ndi
 
 from segmentation_tools import check_ndimage, quick_plot
 from timeit_context import timeit_context
 
+#http://www.imagecomputing.org/~cmli/DRLSE/
 
 def edge_indicator1(i, sigma):
     """
@@ -43,13 +45,9 @@ def delta_operator(x, epsilon):
     :param epsilon: float
     :return: 3d ndarray of floats of the same shape as x
     """
-    const1 = 1.0 / (2.0 * epsilon)
-    const2 = np.pi / epsilon
-    modify_mask = abs(x) <= epsilon
-
-    res = np.zeros(x.shape, dtype=np.float64)
-    res[modify_mask] = const1 * (1 + np.cos(const2 * x[modify_mask]))
-    return res
+    f = (0.5 / epsilon) * (1.0 + np.cos(np.pi * x / epsilon))
+    b = (x <= epsilon) & (x >= -epsilon)
+    return f * b
 
 
 def dp(s):
@@ -79,7 +77,7 @@ def magnitude_of_gradient(grad_f):
     return np.sqrt(np.ufunc.reduce(np.add, [x**2 for x in grad_f]))
 
 
-def divergence(f):
+def div(f):
     """
     Computes the divergence of the vector field f, corresponding to dFx/dx + dFy/dy + ...
     :param f: List of ndarrays, where every item of the list is one dimension of the vector field
@@ -110,7 +108,7 @@ def draw_circle(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=3):
+    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=100):
         self.image = image
         self.phi = None
 
@@ -123,8 +121,6 @@ class LevelSets(object):
         self.num_loops_to_yield = num_loops_to_yield
 
     def run(self):
-        self.image = self.image[:, :, 4]
-
         # Sanitize inputs
         try:
             check_ndimage(self.image)
@@ -132,28 +128,38 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = draw_circle(self.phi, center=(100, 100, 5), radius=10, inside=2, outside=-2)
-        g = edge_indicator1(self.image, self.sigma)
+        self.phi = draw_circle(self.phi, center=(100, 100, 5), radius=10, inside=20, outside=-20)
 
-        max_iter = 400
+        g = edge_indicator2(self.image, self.sigma)
+
+        [vx, vy, vz] = np.gradient(g)
+
+        max_iter = 300
         for i in range(max_iter):
-            grad = np.gradient(self.phi)
-            mag_grad = magnitude_of_gradient(grad)
-            mag_grad = mag_grad.clip(0.0000001)  # Clip the smallest value of mag_grad to this, to avoid div/0
-            delta = delta_operator(self.phi, self.epsilon)
+            [phi_x, phi_y, phi_z] = np.gradient(self.phi)
+            s = magnitude_of_gradient([phi_x, phi_y, phi_z])
 
-            R = self.mu * divergence(dp(mag_grad) * grad)
-            L = self.lamb * delta * divergence(g * grad/mag_grad)
-            A = self.alpha * g * delta
+            Nx = phi_x / (s + 0.0000001)
+            Ny = phi_y / (s + 0.0000001)
+            Nz = phi_z / (s + 0.0000001)
 
-            # quick_plot(delta, "delta")
-            # quick_plot(R, "R")
-            # quick_plot(L, "L")
-            # quick_plot(A, "A")
+            curvature = div([Nx, Ny, Nz])
+
+            dirac = delta_operator(self.phi, self.epsilon)
+
+            # Compute stuff for distance regularization term
+            a = (s >= 0.0) & (s <= 1.0)
+            b = (s > 1.0)
+            ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
+            dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
+
+            R = self.mu * (div([dps * phi_x - phi_x, dps * phi_y - phi_y, dps * phi_z - phi_z]) +
+                           4 * ndi.filters.laplace(self.phi))
+            L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
+                             dirac * g * curvature)
+            A = self.alpha * (g * dirac)
 
             self.phi += self.delta_t * (R + L + A)
-
-            # quick_plot(self.phi)
 
             if i % self.num_loops_to_yield == 0:
                 yield self.phi

@@ -94,7 +94,8 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
         series_pix = algorithm.image[:, :, image_slice]
 
     series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-    seg_img = ax.contour(X, Y, seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet')
+    # seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+    seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
 
     plt.colorbar(series_img, ax=ax)
     plt.colorbar(seg_img, ax=ax)
@@ -108,7 +109,8 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
 
         ax.clear()
         series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-        seg_img = ax.contour(X, Y, seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+        # seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+        seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
         plt.pause(0.001)
         plt.draw()
 
