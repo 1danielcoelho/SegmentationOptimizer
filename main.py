@@ -9,6 +9,10 @@ from fuzzy_connectedness import FuzzyConnectedness
 from level_sets import LevelSets
 from profile_func import profile_func
 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+from matplotlib.ticker import LinearLocator, FormatStrFormatter
+
 
 def incremental_plot_seg(algo, image_slice=0):
     """    
@@ -62,6 +66,57 @@ def incremental_plot_seg(algo, image_slice=0):
     plt.show(block=True)
 
 
+def incremental_plot_level_sets(algorithm, image_slice=0):
+    image = algorithm.image
+    (width, height, depth) = image.shape
+    xx, yy = np.meshgrid(np.linspace(0, width, width), np.linspace(0, height, height))
+
+    # Create x, y and z coordinates for the image mesh vertices
+    X = xx
+    Y = yy
+    Z = 10 * np.ones(X.shape)
+
+    R = np.sqrt((X-(width/2)/(width/2)) ** 2 + (Y/height) ** 2)
+    ZSurf = 100 * np.sin(R)
+
+    # Get image slice
+    slice_image = image[:, :, image_slice]
+
+    # create the figure
+    fig = plt.figure()
+    ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(122, projection='3d')
+
+    # Draw on the 2D image
+    img2d = ax1.imshow(slice_image, cmap=plt.cm.gray, interpolation='nearest', origin='lower', extent=[0, 1, 0, 1])
+
+    # Draw on the 3D image
+    img3d = ax2.contourf(X, Y, slice_image, 10, zdir='z', offset=0, cmap=cm.gray)
+    surf = ax2.plot_surface(X, Y, ZSurf, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+
+    # # Make data.
+    # X = np.arange(-5, 5, 0.25)
+    # Y = np.arange(-5, 5, 0.25)
+    # X, Y = np.meshgrid(X, Y)
+
+    #
+    # # Plot the surface.
+    #
+    #
+
+    #
+    # # Add a color bar which maps values to colors.
+    # fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    # Customize the z axis.
+    ax2.zaxis.set_major_locator(LinearLocator(10))
+    ax2.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+    ax2.set_zlim((-100, 100))
+
+    plt.colorbar(img2d, ax=ax1)
+    plt.show()
+
+
 def test_region_growing():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
@@ -86,7 +141,8 @@ def test_level_sets():
 
     algorithm = LevelSets(series_arr)
     # algorithm.run()
-    incremental_plot_seg(algo=algorithm, image_slice=4)
+    # incremental_plot_seg(algo=algorithm, image_slice=10)
+    incremental_plot_level_sets(algorithm=algorithm, image_slice=0)
 
 
 # @profile_func
