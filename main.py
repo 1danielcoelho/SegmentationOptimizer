@@ -67,54 +67,52 @@ def incremental_plot_seg(algo, image_slice=0):
 
 
 def incremental_plot_level_sets(algorithm, image_slice=0):
+    """    
+    :param algorithm: Some object that can be called as a generator and yields a boolean image
+     Should have 'image'. It if has 'seeds', they will be plotted
+    :param image_slice: Zero-based index of the slice to plot in visualization
+    :return: 
+    """
+
     image = algorithm.image
     (width, height, depth) = image.shape
     xx, yy = np.meshgrid(np.linspace(0, width, width), np.linspace(0, height, height))
-
-    # Create x, y and z coordinates for the image mesh vertices
     X = xx
     Y = yy
-    Z = 10 * np.ones(X.shape)
 
-    R = np.sqrt((X-(width/2)/(width/2)) ** 2 + (Y/height) ** 2)
-    ZSurf = 100 * np.sin(R)
+    fig1 = plt.figure()
+    plt.set_cmap(plt.gray())  # Set grayscale color palette as default
 
-    # Get image slice
-    slice_image = image[:, :, image_slice]
+    ax = fig1.add_subplot(111)
+    ax.set_aspect('equal', 'datalim')
 
-    # create the figure
-    fig = plt.figure()
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122, projection='3d')
+    seg_slice = np.zeros([width, height], dtype=np.float32)
 
-    # Draw on the 2D image
-    img2d = ax1.imshow(slice_image, cmap=plt.cm.gray, interpolation='nearest', origin='lower', extent=[0, 1, 0, 1])
+    if algorithm.image.ndim == 2:
+        series_pix = algorithm.image
+    else:
+        series_pix = algorithm.image[:, :, image_slice]
 
-    # Draw on the 3D image
-    img3d = ax2.contourf(X, Y, slice_image, 10, zdir='z', offset=0, cmap=cm.gray)
-    surf = ax2.plot_surface(X, Y, ZSurf, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+    series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
+    seg_img = ax.contour(X, Y, seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet')
 
-    # # Make data.
-    # X = np.arange(-5, 5, 0.25)
-    # Y = np.arange(-5, 5, 0.25)
-    # X, Y = np.meshgrid(X, Y)
+    plt.colorbar(series_img, ax=ax)
+    plt.colorbar(seg_img, ax=ax)
+    plt.show(block=False)
 
-    #
-    # # Plot the surface.
-    #
-    #
+    for t in algorithm.run():
+        if t.ndim == 3:
+            seg_slice = t[:, :, image_slice]
+        else:
+            seg_slice = t
 
-    #
-    # # Add a color bar which maps values to colors.
-    # fig.colorbar(surf, shrink=0.5, aspect=5)
+        ax.clear()
+        series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
+        seg_img = ax.contour(X, Y, seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+        plt.pause(0.001)
+        plt.draw()
 
-    # Customize the z axis.
-    ax2.zaxis.set_major_locator(LinearLocator(10))
-    ax2.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    ax2.set_zlim((-100, 100))
-
-    plt.colorbar(img2d, ax=ax1)
-    plt.show()
+    plt.show(block=True)
 
 
 def test_region_growing():
