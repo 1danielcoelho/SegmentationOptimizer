@@ -124,7 +124,7 @@ def vNBounds(phi):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=-1.5, lamb=2.0, mu=0.2, sigma=0.2, epsilon=1.5, delta_t=1.0, num_loops_to_yield=3):
+    def __init__(self, image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.2, epsilon=1.5, delta_t=1.0, num_loops_to_yield=5):
         self.image = image
         self.phi = None
 
@@ -137,8 +137,6 @@ class LevelSets(object):
         self.num_loops_to_yield = num_loops_to_yield
 
     def run(self):
-        # self.image = self.image[:, :, 2]
-
         # Sanitize inputs
         try:
             check_ndimage(self.image)
@@ -146,30 +144,22 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = 2 * np.ones(self.image.shape, dtype=np.float64)
-        self.phi[40:45, 40:45] = -2
+        self.phi[40:45, 40:45, 7:10] = -2
 
         g = edge_indicator2(self.image, self.sigma)
+        [vz, vy, vx] = np.gradient(g)
 
-        # [vx, vy, vz] = np.gradient(g)
-        [vy, vx] = np.gradient(g)
-
-        max_iter = 500
+        max_iter = 1000
         for i in range(max_iter):
-            # if i % 20 == 0:
-            #     quick_plot(self.phi, 'my phi, round ' + str(i))
-
-            # vNBounds(self.phi)
-            # phi_x, phi_y, phi_z = np.gradient(self.phi)
-            phi_y, phi_x = np.gradient(self.phi)
-            # s = magnitude_of_gradient([phi_x, phi_y, phi_z])
-            s = magnitude_of_gradient([phi_y, phi_x])
+            vNBounds(self.phi)
+            phi_z, phi_y, phi_x = np.gradient(self.phi)
+            s = magnitude_of_gradient([phi_z, phi_y, phi_x])
 
             Nx = phi_x / (s + 0.0000001)
             Ny = phi_y / (s + 0.0000001)
-            # Nz = phi_z / (s + 0.0000001)
+            Nz = phi_z / (s + 0.0000001)
 
-            # curvature = div([Nx, Ny, Nz])
-            curvature = div2d(Nx, Ny)
+            curvature = div([Nz, Ny, Nx])
 
             dirac = delta_operator(self.phi, self.epsilon)
 
@@ -179,15 +169,10 @@ class LevelSets(object):
             ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
             dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
 
-            # R = self.mu * (div([dps * phi_x - phi_x, dps * phi_y - phi_y, dps * phi_z - phi_z]) +
-            #                4 * ndi.filters.laplace(self.phi))
-
-            R = self.mu * (div2d(dps * phi_x - phi_x, dps * phi_y - phi_y) +
+            R = self.mu * (div([dps * phi_z - phi_z, dps * phi_y - phi_y, dps * phi_x - phi_x]) +
                            ndi.filters.laplace(self.phi))
 
-            # L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
-            #                  dirac * g * curvature)
-            L = self.lamb * (dirac * (vx * Nx + vy * Ny) +
+            L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
                              dirac * g * curvature)
 
             A = self.alpha * (g * dirac)

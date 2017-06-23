@@ -136,22 +136,19 @@ def test_level_sets():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
 
-    other_arr = np.zeros([50, 50, 5])
+    other_arr = np.zeros([50, 50, 10])
 
     (width, height, depth) = other_arr.shape
     for x in range(width):
         for y in range(height):
             for z in range(depth):
-                if x > 10 and x < 30 and y > 10 and y < 30:
+                if x > 10 and x < 30 and y > 10 and y < 30 and z > 2 and z <= 5:
                     other_arr[x, y, z] = 100
 
-    algorithm = LevelSets(other_arr[:, :, 2])
+    algorithm = LevelSets(other_arr)
     # algorithm.run()
     # incremental_plot_seg(algo=algorithm, image_slice=10)
-    incremental_plot_level_sets(algorithm=algorithm, image_slice=2)
-
-    phi = dslre(other_arr[:, :, 2])
-    quick_plot(phi)
+    incremental_plot_level_sets(algorithm=algorithm, image_slice=3)
 
 
 # @profile_func

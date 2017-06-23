@@ -46,9 +46,6 @@ def distReg_p2(phi, dx, dy, mag):
 def drlse_edge(phi, edge, lambdap, mu, alpha, epsilon, timestep, iter_inner):
     vy, vx = np.gradient(edge)
     for i2 in range(iter_inner):
-        if i2 % 20 == 0:
-            quick_plot(phi, 'his phi, round ' + str(i2))
-
         vNBounds(phi)  # edges are duplicated for no flux in or out of image
         dy, dx = np.gradient(phi)
         mag = np.sqrt((dx ** 2) + (dy ** 2))
