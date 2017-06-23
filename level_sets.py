@@ -8,6 +8,7 @@ from segmentation_tools import check_ndimage, quick_plot
 from timeit_context import timeit_context
 
 #http://www.imagecomputing.org/~cmli/DRLSE/
+#https://github.com/leonidk/drlse/blob/master/dlrse.py
 
 def edge_indicator1(i, sigma):
     """
@@ -108,7 +109,7 @@ def draw_circle(array, center, radius, inside, outside):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=100):
+    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=1):
         self.image = image
         self.phi = None
 
@@ -128,13 +129,13 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = draw_circle(self.phi, center=(100, 100, 5), radius=10, inside=20, outside=-20)
+        self.phi = draw_circle(self.phi, center=(20, 20, 2), radius=5, inside=-2, outside=2)
 
         g = edge_indicator2(self.image, self.sigma)
 
         [vx, vy, vz] = np.gradient(g)
 
-        max_iter = 300
+        max_iter = 15
         for i in range(max_iter):
             [phi_x, phi_y, phi_z] = np.gradient(self.phi)
             s = magnitude_of_gradient([phi_x, phi_y, phi_z])

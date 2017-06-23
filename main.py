@@ -94,11 +94,11 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
         series_pix = algorithm.image[:, :, image_slice]
 
     series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-    # seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
-    seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+    seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+    # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
 
     plt.colorbar(series_img, ax=ax)
-    plt.colorbar(seg_img, ax=ax)
+    cb = plt.colorbar(seg_img, ax=ax)
     plt.show(block=False)
 
     for t in algorithm.run():
@@ -109,9 +109,9 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
 
         ax.clear()
         series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-        # seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
-        seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
-        plt.pause(0.001)
+        seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+        # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+        plt.pause(0.1)
         plt.draw()
 
     plt.show(block=True)
@@ -139,20 +139,19 @@ def test_level_sets():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
 
-    other_arr = copy(series_arr)
-    other_arr[:] = 0
+    other_arr = np.zeros([50, 50, 5])
 
     (width, height, depth) = other_arr.shape
     for x in range(width):
         for y in range(height):
             for z in range(depth):
-                if x > 80 and x < 150 and y > 80 and y < 120:
+                if x > 10 and x < 30 and y > 10 and y < 30:
                     other_arr[x, y, z] = 100
 
     algorithm = LevelSets(other_arr)
     # algorithm.run()
     # incremental_plot_seg(algo=algorithm, image_slice=10)
-    incremental_plot_level_sets(algorithm=algorithm, image_slice=0)
+    incremental_plot_level_sets(algorithm=algorithm, image_slice=2)
 
 
 # @profile_func
