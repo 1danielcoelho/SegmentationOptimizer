@@ -88,6 +88,12 @@ def div(f):
     return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
 
 
+def div2d(nx, ny):
+    _, nxx = np.gradient(nx)
+    nyy, _ = np.gradient(ny)
+    return nxx + nyy
+
+
 def draw_circle(array, center, radius, inside, outside):
     a, b, c = center
     mask = []
@@ -108,8 +114,17 @@ def draw_circle(array, center, radius, inside, outside):
     return array
 
 
+def vNBounds(phi):
+    phi[0, :, :] = phi[1, :, :]
+    phi[-1, :, :] = phi[-2, :, :]
+    phi[:, 0, :] = phi[:, 1, :]
+    phi[:, -1, :] = phi[:, -2, :]
+    phi[:, :, 0] = phi[:, :, 1]
+    phi[:, :, -1] = phi[:, :, -2]
+
+
 class LevelSets(object):
-    def __init__(self, image, alpha=1.5, lamb=5.0, mu=0.2, sigma=1.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=1):
+    def __init__(self, image, alpha=-1.5, lamb=2.0, mu=0.2, sigma=0.2, epsilon=1.5, delta_t=1.0, num_loops_to_yield=3):
         self.image = image
         self.phi = None
 
@@ -122,29 +137,39 @@ class LevelSets(object):
         self.num_loops_to_yield = num_loops_to_yield
 
     def run(self):
+        # self.image = self.image[:, :, 2]
+
         # Sanitize inputs
         try:
             check_ndimage(self.image)
         except:
             raise  # re-raises last exception
 
-        self.phi = np.zeros(self.image.shape, dtype=np.float64)
-        self.phi = draw_circle(self.phi, center=(20, 20, 2), radius=5, inside=-2, outside=2)
+        self.phi = 2 * np.ones(self.image.shape, dtype=np.float64)
+        self.phi[40:45, 40:45] = -2
 
         g = edge_indicator2(self.image, self.sigma)
 
-        [vx, vy, vz] = np.gradient(g)
+        # [vx, vy, vz] = np.gradient(g)
+        [vy, vx] = np.gradient(g)
 
-        max_iter = 15
+        max_iter = 500
         for i in range(max_iter):
-            [phi_x, phi_y, phi_z] = np.gradient(self.phi)
-            s = magnitude_of_gradient([phi_x, phi_y, phi_z])
+            # if i % 20 == 0:
+            #     quick_plot(self.phi, 'my phi, round ' + str(i))
+
+            # vNBounds(self.phi)
+            # phi_x, phi_y, phi_z = np.gradient(self.phi)
+            phi_y, phi_x = np.gradient(self.phi)
+            # s = magnitude_of_gradient([phi_x, phi_y, phi_z])
+            s = magnitude_of_gradient([phi_y, phi_x])
 
             Nx = phi_x / (s + 0.0000001)
             Ny = phi_y / (s + 0.0000001)
-            Nz = phi_z / (s + 0.0000001)
+            # Nz = phi_z / (s + 0.0000001)
 
-            curvature = div([Nx, Ny, Nz])
+            # curvature = div([Nx, Ny, Nz])
+            curvature = div2d(Nx, Ny)
 
             dirac = delta_operator(self.phi, self.epsilon)
 
@@ -154,10 +179,17 @@ class LevelSets(object):
             ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
             dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
 
-            R = self.mu * (div([dps * phi_x - phi_x, dps * phi_y - phi_y, dps * phi_z - phi_z]) +
-                           4 * ndi.filters.laplace(self.phi))
-            L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
+            # R = self.mu * (div([dps * phi_x - phi_x, dps * phi_y - phi_y, dps * phi_z - phi_z]) +
+            #                4 * ndi.filters.laplace(self.phi))
+
+            R = self.mu * (div2d(dps * phi_x - phi_x, dps * phi_y - phi_y) +
+                           ndi.filters.laplace(self.phi))
+
+            # L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
+            #                  dirac * g * curvature)
+            L = self.lamb * (dirac * (vx * Nx + vy * Ny) +
                              dirac * g * curvature)
+
             A = self.alpha * (g * dirac)
 
             self.phi += self.delta_t * (R + L + A)

@@ -9,10 +9,12 @@ from fuzzy_connectedness import FuzzyConnectedness
 from level_sets import LevelSets
 from profile_func import profile_func
 
+from segmentation_tools import quick_plot
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 
+from sampledrlse import dslre
 
 def incremental_plot_seg(algo, image_slice=0):
     """    
@@ -75,18 +77,13 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
     """
 
     image = algorithm.image
-    (width, height, depth) = image.shape
-    xx, yy = np.meshgrid(np.linspace(0, width, width), np.linspace(0, height, height))
-    X = xx
-    Y = yy
-
     fig1 = plt.figure()
     plt.set_cmap(plt.gray())  # Set grayscale color palette as default
 
     ax = fig1.add_subplot(111)
     ax.set_aspect('equal', 'datalim')
 
-    seg_slice = np.zeros([width, height], dtype=np.float32)
+    seg_slice = np.zeros([image.shape[0], image.shape[1]], dtype=np.float32)
 
     if algorithm.image.ndim == 2:
         series_pix = algorithm.image
@@ -94,7 +91,7 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
         series_pix = algorithm.image[:, :, image_slice]
 
     series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-    seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+    seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
     # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
 
     plt.colorbar(series_img, ax=ax)
@@ -109,9 +106,9 @@ def incremental_plot_level_sets(algorithm, image_slice=0):
 
         ax.clear()
         series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
-        seg_img = ax.contour(seg_slice, [-4, -3, -2, -1, 0, 1, 2, 3, 4], cmap='jet', alpha=0.6)
+        seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
         # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
-        plt.pause(0.1)
+        plt.pause(0.001)
         plt.draw()
 
     plt.show(block=True)
@@ -148,10 +145,13 @@ def test_level_sets():
                 if x > 10 and x < 30 and y > 10 and y < 30:
                     other_arr[x, y, z] = 100
 
-    algorithm = LevelSets(other_arr)
+    algorithm = LevelSets(other_arr[:, :, 2])
     # algorithm.run()
     # incremental_plot_seg(algo=algorithm, image_slice=10)
     incremental_plot_level_sets(algorithm=algorithm, image_slice=2)
+
+    phi = dslre(other_arr[:, :, 2])
+    quick_plot(phi)
 
 
 # @profile_func
