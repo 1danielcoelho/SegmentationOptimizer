@@ -145,7 +145,7 @@ def test_level_sets():
                 if x > 10 and x < 30 and y > 10 and y < 30 and z > 2 and z <= 5:
                     other_arr[x, y, z] = 100
 
-    algorithm = LevelSets(other_arr)
+    algorithm = LevelSets(series_arr)
     # algorithm.run()
     # incremental_plot_seg(algo=algorithm, image_slice=10)
     incremental_plot_level_sets(algorithm=algorithm, image_slice=3)

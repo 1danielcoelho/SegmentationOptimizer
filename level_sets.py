@@ -124,7 +124,7 @@ def vNBounds(phi):
 
 
 class LevelSets(object):
-    def __init__(self, image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.2, epsilon=1.5, delta_t=1.0, num_loops_to_yield=5):
+    def __init__(self, image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=10):
         self.image = image
         self.phi = None
 
@@ -144,13 +144,14 @@ class LevelSets(object):
             raise  # re-raises last exception
 
         self.phi = 2 * np.ones(self.image.shape, dtype=np.float64)
-        self.phi[40:45, 40:45, 7:10] = -2
+        self.phi[120:150, 120:150, :] = -2
 
         g = edge_indicator2(self.image, self.sigma)
         [vz, vy, vx] = np.gradient(g)
 
-        max_iter = 1000
+        max_iter = 10000
         for i in range(max_iter):
+            print(i)
             vNBounds(self.phi)
             phi_z, phi_y, phi_x = np.gradient(self.phi)
             s = magnitude_of_gradient([phi_z, phi_y, phi_x])
