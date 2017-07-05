@@ -8,6 +8,7 @@ from timeit_context import timeit_context
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import time
+from scipy.ndimage.morphology import binary_dilation
 
 #http://www.imagecomputing.org/~cmli/DRLSE/
 #https://github.com/leonidk/drlse/blob/master/dlrse.py
@@ -180,6 +181,26 @@ def get_or_add_default(params, param_name, default):
         return default
 
 
+def zero_crossing_mask(array):
+    res = np.zeros(array.shape, dtype=np.bool)
+
+    ax0diff = np.diff(np.signbit(array), axis=0)
+    res[1:] += ax0diff
+    res[:-1] += ax0diff
+
+    if res.ndim == 2:
+        ax1diff = np.diff(np.signbit(array), axis=1)
+        res[:, 1:] += ax1diff
+        res[:, :-1] += ax1diff
+
+    if res.ndim == 3:
+        ax2diff = np.diff(np.signbit(array), axis=2)
+        res[:, :, 1:] += ax2diff
+        res[:, :, :-1] += ax2diff
+
+    return res
+
+
 def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=10,
                plot=False, plot_slice=0, profile=False):
     """
@@ -263,9 +284,19 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     g = edge_indicator2(image, sigma)
     [vz, vy, vx] = np.gradient(g)
 
+    #multiplica phi com phi deslocado 1 pra esquerda, depois usa np.sign. Onde sign = -1, é um zero-crossing point
+    #mesmo vertical
+    #cria uma mascara se sign_hor é -1 ou sign_vert é -1 --> Z
+    #dilate mask em 1
+    #use np.ma
+
+    phi_mask = zero_crossing_mask(phi)
+    phi_mask = binary_dilation(phi_mask)
+    phi_masked = np.ma.masked_array(phi, ~phi_mask)
+
     for i in range(max_iter):
-        vn_bounds(phi)
-        phi_z, phi_y, phi_x = np.gradient(phi)
+        vn_bounds(phi_masked)
+        phi_z, phi_y, phi_x = np.gradient(phi_masked)
         s = magnitude_of_gradient([phi_z, phi_y, phi_x])
 
         nx = phi_x / (s + 0.0000001)
@@ -274,7 +305,7 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
         curvature = div([nz, ny, nx])
 
-        dirac = delta_operator(phi, epsilon)
+        dirac = delta_operator(phi_masked, epsilon)
 
         # Compute stuff for distance regularization term
         a = (s >= 0.0) & (s <= 1.0)
@@ -286,7 +317,15 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         l_term = lamb * (dirac * (vx * nx + vy * ny + vz * nz) + dirac * g * curvature)
         a_term = alpha * (g * dirac)
 
-        phi += delta_t * (r_term + l_term + a_term)
+        phi_masked += delta_t * (r_term + l_term + a_term)
+
+        # Update binary mask
+        new_mask = zero_crossing_mask(phi_masked) # ???
+        new_mask = binary_dilation(new_mask)
+        new_spels = new_mask & ~phi_mask
+        phi[new_spels] =
+
+        check this http://cs.au.dk/~tgk/courses/LevelSets/LevelSet.pdf
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:
