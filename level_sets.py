@@ -172,8 +172,48 @@ def vn_bounds(phi):
     phi[:, :, -1] = phi[:, :, -2]
 
 
-def level_sets(image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=10, phi=None,
-               max_iter=10000, plot=False, profile=False, plot_slice=0):
+def get_or_add_default(params, param_name, default):
+    if param_name in params:
+        return params[param_name]
+    else:
+        params[param_name] = default
+        return default
+
+
+def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=10,
+               plot=False, plot_slice=0, profile=False):
+    """
+    Performs the Distance-Regularized Level Set Evolution (DRLSE) algorithm on 'image', using 'params' and an initial
+    'phi' level set function. Will create and update a 2D plot of the algorithms' progress on slice 'plot_slice' if
+    'plot' is True. Will output execution time if 'profile' is True.
+    Default parameters that will be used if they are missing from 'params':
+    'alpha': -5.0
+    'lamb': 5.0
+    'mu': 0.1
+    'sigma': 0.5
+    'epsilon': 1.5
+    'delta_t': 1.0
+    :param image: 3D ndarray containing the volume to segment using DRLSE
+    :param params: Dictionary containing parameters used by the algorithm
+    :param phi: 3D ndarray of the same shape as 'image' used to contain the level sets function. Should contain some
+    negative value (like -2) 'inside' the desired area, and a positive value (like 2) outside. If None, will be
+    initialized within the function.
+    :param max_iter: Maximum number of iterations to apply to the level set function
+    :param num_iter_to_update_plot: Number of iterations between plot updates. Having this too low might affect overall
+    runtimes
+    :param plot: When True, will cause a 2D plot to be created and updated with the algorithm's progress
+    :param plot_slice: Which slice will be used to plot in case 'plot' is True
+    :param profile: Whether we output the total running time of the algorithm at the end of its execution
+    :return: Final 'phi' once the algorithm is complete. The zero-level contour corresponds to the final segmentation
+    """
+
+    # Extract params from 'params' or get default values, and insert them into params
+    alpha = get_or_add_default(params, 'alpha', -5.0)
+    lamb = get_or_add_default(params, 'lamb', 5.0)
+    mu = get_or_add_default(params, 'mu', 0.1)
+    sigma = get_or_add_default(params, 'sigma', 0.5)
+    epsilon = get_or_add_default(params, 'epsilon', 1.5)
+    delta_t = get_or_add_default(params, 'delta_t', 1.0)
 
     # Sanitize inputs
     try:
@@ -210,10 +250,11 @@ def level_sets(image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_
         seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
         # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
 
-        plt.title('Distance-Regularized Level Set Evolution')
+        plt.title('DRLSE for slice ' + str(plot_slice) + '. Iteration 0 out of ' + str(max_iter))
         plt.colorbar(series_img, ax=ax)
         plt.colorbar(seg_img, ax=ax)
         plt.show(block=False)
+        plt.pause(0.001)
 
     start_time = 0
     if profile:
@@ -247,7 +288,7 @@ def level_sets(image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_
 
         phi += delta_t * (r_term + l_term + a_term)
 
-        if plot and i % num_loops_to_yield == 0:
+        if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:
                 seg_slice = phi
                 series_slice = image
@@ -259,6 +300,8 @@ def level_sets(image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_
             ax.imshow(series_slice, interpolation='nearest', origin='bottom')
             ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
             # ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+
+            plt.title('DRLSE for slice ' + str(plot_slice) + '. Iteration ' + str(i+1) + ' out of ' + str(max_iter))
 
             plt.pause(0.001)
             plt.draw()

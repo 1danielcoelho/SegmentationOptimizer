@@ -145,8 +145,9 @@ def test_level_sets():
                 if x > 10 and x < 30 and y > 10 and y < 30 and z > 2 and z <= 5:
                     other_arr[x, y, z] = 100
 
-    phi = level_sets(series_arr, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0,
-                     num_loops_to_yield=10, phi=None, max_iter=100, plot=True, profile=True)
+    level_set_params = {'alpha': -5.0, 'lamb': 5.0, 'mu': 0.1, 'sigma': 0.5, 'epsilon': 1.5, 'delta_t': 1.0}
+    phi = level_sets(series_arr, level_set_params,
+                     num_iter_to_update_plot=1, phi=None, max_iter=100, plot=True, profile=True)
 
 
 # @profile_func
