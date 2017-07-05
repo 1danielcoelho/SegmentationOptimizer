@@ -3,12 +3,61 @@ import scipy.ndimage.filters as fi
 import scipy.stats as st
 import scipy.signal as sg
 import scipy.ndimage as ndi
-
 from segmentation_tools import check_ndimage, quick_plot
 from timeit_context import timeit_context
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+import time
 
 #http://www.imagecomputing.org/~cmli/DRLSE/
 #https://github.com/leonidk/drlse/blob/master/dlrse.py
+
+
+def incremental_plot_level_sets(algorithm, image_slice=0):
+    """
+    :param algorithm: Some object that can be called as a generator and yields a boolean image
+     Should have 'image'. It if has 'seeds', they will be plotted
+    :param image_slice: Zero-based index of the slice to plot in visualization
+    :return:
+    """
+
+    image = algorithm.image
+    fig1 = plt.figure()
+    plt.set_cmap(plt.gray())  # Set grayscale color palette as default
+
+    ax = fig1.add_subplot(111)
+    ax.set_aspect('equal', 'datalim')
+
+    seg_slice = np.zeros([image.shape[0], image.shape[1]], dtype=np.float32)
+
+    if algorithm.image.ndim == 2:
+        series_pix = algorithm.image
+    else:
+        series_pix = algorithm.image[:, :, image_slice]
+
+    series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
+    seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
+    # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+
+    plt.colorbar(series_img, ax=ax)
+    cb = plt.colorbar(seg_img, ax=ax)
+    plt.show(block=False)
+
+    for t in algorithm.run():
+        if t.ndim == 3:
+            seg_slice = t[:, :, image_slice]
+        else:
+            seg_slice = t
+
+        ax.clear()
+        series_img = ax.imshow(series_pix, interpolation='nearest', origin='bottom')
+        seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
+        # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+        plt.pause(0.001)
+        plt.draw()
+
+    plt.show(block=True)
+
 
 def edge_indicator1(i, sigma):
     """
@@ -114,7 +163,7 @@ def draw_circle(array, center, radius, inside, outside):
     return array
 
 
-def vNBounds(phi):
+def vn_bounds(phi):
     phi[0, :, :] = phi[1, :, :]
     phi[-1, :, :] = phi[-2, :, :]
     phi[:, 0, :] = phi[:, 1, :]
@@ -123,64 +172,105 @@ def vNBounds(phi):
     phi[:, :, -1] = phi[:, :, -2]
 
 
-class LevelSets(object):
-    def __init__(self, image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=10):
-        self.image = image
-        self.phi = None
+def level_sets(image, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0, num_loops_to_yield=10, phi=None,
+               max_iter=10000, plot=False, profile=False, plot_slice=0):
 
-        self.alpha = alpha
-        self.lamb = lamb
-        self.mu = mu
-        self.sigma = sigma
-        self.epsilon = epsilon
-        self.delta_t = delta_t
-        self.num_loops_to_yield = num_loops_to_yield
+    # Sanitize inputs
+    try:
+        check_ndimage(image)
 
-    def run(self):
-        # Sanitize inputs
-        try:
-            check_ndimage(self.image)
-        except:
-            raise  # re-raises last exception
+        if phi is None:
+            phi = 2 * np.ones(image.shape, dtype=np.float64)
+            phi[120:150, 120:150, 3:6] = -2
+        else:
+            check_ndimage(phi)
 
-        self.phi = 2 * np.ones(self.image.shape, dtype=np.float64)
-        self.phi[120:150, 120:150, :] = -2
+        if image.shape != phi.shape:
+            raise AttributeError('Image and phi have different shapes!')
 
-        g = edge_indicator2(self.image, self.sigma)
-        [vz, vy, vx] = np.gradient(g)
+        if mu * delta_t >= 0.25:
+            print('WARNING: mu and delta_t do not satisfy CFL condition for numerical stability (mu * delta_t < 0.25)')
+    except:
+        raise  # re-raises last exception
 
-        max_iter = 10000
-        for i in range(max_iter):
-            print(i)
-            vNBounds(self.phi)
-            phi_z, phi_y, phi_x = np.gradient(self.phi)
-            s = magnitude_of_gradient([phi_z, phi_y, phi_x])
+    # Prepare plot if necessary
+    if plot:
+        fig1 = plt.figure()
+        ax = fig1.add_subplot(111)
+        ax.set_aspect('equal', 'datalim')
 
-            Nx = phi_x / (s + 0.0000001)
-            Ny = phi_y / (s + 0.0000001)
-            Nz = phi_z / (s + 0.0000001)
+        seg_slice = np.zeros([image.shape[0], image.shape[1]], dtype=np.float32)
 
-            curvature = div([Nz, Ny, Nx])
+        if image.ndim == 2:
+            series_slice = image
+        else:
+            series_slice = image[:, :, plot_slice]
 
-            dirac = delta_operator(self.phi, self.epsilon)
+        series_img = ax.imshow(series_slice, interpolation='nearest', origin='bottom')
+        seg_img = ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
+        # seg_img = ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
 
-            # Compute stuff for distance regularization term
-            a = (s >= 0.0) & (s <= 1.0)
-            b = (s > 1.0)
-            ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
-            dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
+        plt.title('Distance-Regularized Level Set Evolution')
+        plt.colorbar(series_img, ax=ax)
+        plt.colorbar(seg_img, ax=ax)
+        plt.show(block=False)
 
-            R = self.mu * (div([dps * phi_z - phi_z, dps * phi_y - phi_y, dps * phi_x - phi_x]) +
-                           ndi.filters.laplace(self.phi))
+    start_time = 0
+    if profile:
+        start_time = time.time()
 
-            L = self.lamb * (dirac * (vx * Nx + vy * Ny + vz * Nz) +
-                             dirac * g * curvature)
+    g = edge_indicator2(image, sigma)
+    [vz, vy, vx] = np.gradient(g)
 
-            A = self.alpha * (g * dirac)
+    for i in range(max_iter):
+        vn_bounds(phi)
+        phi_z, phi_y, phi_x = np.gradient(phi)
+        s = magnitude_of_gradient([phi_z, phi_y, phi_x])
 
-            self.phi += self.delta_t * (R + L + A)
+        nx = phi_x / (s + 0.0000001)
+        ny = phi_y / (s + 0.0000001)
+        nz = phi_z / (s + 0.0000001)
 
-            if i % self.num_loops_to_yield == 0:
-                yield self.phi
+        curvature = div([nz, ny, nx])
 
-        yield self.phi
+        dirac = delta_operator(phi, epsilon)
+
+        # Compute stuff for distance regularization term
+        a = (s >= 0.0) & (s <= 1.0)
+        b = (s > 1.0)
+        ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
+        dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
+
+        r_term = mu * (div([dps * phi_z - phi_z, dps * phi_y - phi_y, dps * phi_x - phi_x]) + ndi.filters.laplace(phi))
+        l_term = lamb * (dirac * (vx * nx + vy * ny + vz * nz) + dirac * g * curvature)
+        a_term = alpha * (g * dirac)
+
+        phi += delta_t * (r_term + l_term + a_term)
+
+        if plot and i % num_loops_to_yield == 0:
+            if phi.ndim == 2:
+                seg_slice = phi
+                series_slice = image
+            else:
+                seg_slice = phi[:, :, plot_slice]
+                series_slice = image[:, :, plot_slice]
+
+            ax.clear()
+            ax.imshow(series_slice, interpolation='nearest', origin='bottom')
+            ax.contour(seg_slice, [-2, -1, 0, 1, 2], cmap='jet', alpha=0.6)
+            # ax.imshow(seg_slice, cmap='jet', alpha=0.6, interpolation='nearest', origin='bottom')
+
+            plt.pause(0.001)
+            plt.draw()
+
+    # Print profiling results
+    if profile:
+        elapsed_time = time.time() - start_time
+        print('[{}] finished in {} ms'.format('Level sets', int(elapsed_time * 1000)))
+
+    # Keep plot open when the algorithm finishes
+    if plot:
+        plt.show(block=True)
+
+    return phi
+

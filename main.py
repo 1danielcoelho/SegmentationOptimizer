@@ -6,7 +6,7 @@ from copy import copy
 from open import dicom_datasets_to_numpy, load_dicom_folder
 from region_growing import RegionGrowing
 from fuzzy_connectedness import FuzzyConnectedness
-from level_sets import LevelSets
+from level_sets import level_sets
 from profile_func import profile_func
 
 from segmentation_tools import quick_plot
@@ -42,7 +42,7 @@ def incremental_plot_seg(algo, image_slice=0):
                         interpolation='nearest',
                         origin='bottom',
                         alpha=0.7,
-                        cmap='cool',
+                        cmap='rainbow',
                         norm=colors.Normalize(vmin=0.0, vmax=1.0))  # vmax=0.5 means True values will go over
 
     try:
@@ -126,9 +126,9 @@ def test_region_growing():
 def test_fuzzy_connectedness():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
-    seeds = np.array([[33, 105, 0], [49, 50, 0], [157, 54, 0], [166, 127, 0], [60, 180, 0], [149, 185, 0]])
+    seeds = np.array([[137, 40, 0], [170, 90, 0], [170, 105, 0], [37, 79, 0]])
 
-    algorithm = FuzzyConnectedness(series_arr, seeds, object_threshold=0.1, num_loops_to_yield=100)
+    algorithm = FuzzyConnectedness(series_arr, seeds, object_threshold=0.01, num_loops_to_yield=100)
     incremental_plot_seg(algo=algorithm, image_slice=0)
 
 
@@ -145,10 +145,8 @@ def test_level_sets():
                 if x > 10 and x < 30 and y > 10 and y < 30 and z > 2 and z <= 5:
                     other_arr[x, y, z] = 100
 
-    algorithm = LevelSets(series_arr)
-    # algorithm.run()
-    # incremental_plot_seg(algo=algorithm, image_slice=10)
-    incremental_plot_level_sets(algorithm=algorithm, image_slice=3)
+    phi = level_sets(series_arr, alpha=-5, lamb=5.0, mu=0.1, sigma=0.5, epsilon=1.5, delta_t=1.0,
+                     num_loops_to_yield=10, phi=None, max_iter=100, plot=True, profile=True)
 
 
 # @profile_func

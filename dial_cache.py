@@ -20,7 +20,7 @@ class DialCache(object):
         """
         Starting at self.largest_affinity and going down in affinity value, looks for
         the first non-empty bucket it can find and sets largest_affinity to its index
-        :return: 
+        :return: None
         """
         while len(self.main_list[self.largest_affinity]) < 1:
             self.largest_affinity -= 1
@@ -28,7 +28,7 @@ class DialCache(object):
     def push(self, spel_pos, affinity):
         """
         Adds a spel to DialCache assigned to the given affinity value
-        :param spel_pos: 3-tuple of the spel position pixel coordinates  
+        :param spel_pos: 3-tuple (needs to be hashable) of the spel position pixel coordinates
         :param affinity: affinity value value in the [0.0, 1.0] float range
         :return: None
         """
@@ -59,7 +59,7 @@ class DialCache(object):
     def update_spel(self, spel_pos, new_affinity):
         """
         Updates the affinity value assigned to spel_pos in our internal data structures
-        :param spel_pos: 3-tuple of the spel position pixel coordinates  
+        :param spel_pos: 3-tuple (needs to be hashable) of the spel position pixel coordinates
         :param new_affinity: new affinity value value in the [0.0, 1.0] float range
         :return: None
         """

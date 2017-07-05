@@ -5,35 +5,30 @@ from dial_cache import DialCache
 from timeit_context import timeit_context
 
 
+def gaussian(x, mu, sig):
+    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+
+
+def relative_difference(c, d):
+    return abs(c - d) / (c + d)
+
+
+def average(c, d):
+    return 0.5 * (c + d)
+
+
+def affinity_one(c, d, mean_ave, sigma_ave, mean_reldiff, sigma_reldiff):
+    ave = gaussian(average(c, d), mean_ave, sigma_ave)
+    rel = gaussian(relative_difference(c, d), mean_reldiff, sigma_reldiff)
+    return min(ave, rel)
+
+
 class FuzzyConnectedness(object):
-    def __init__(self, image, seeds, object_threshold=0.19, num_loops_to_yield=100):
+    def __init__(self, image, seeds, object_threshold=0.1, num_loops_to_yield=100):
         self.image = image
         self.seeds = seeds
         self.object_threshold = object_threshold
         self.num_loops_to_yield = num_loops_to_yield
-
-    @staticmethod
-    def gaussian(x, mu, sig):
-        return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
-
-    @staticmethod
-    def relative_difference(c, d):
-        return abs(c - d) / (c + d)
-
-    @staticmethod
-    def average(c, d):
-        return 0.5 * (c + d)
-
-    @staticmethod
-    def affinity_one(c, d, mean_ave, sigma_ave, mean_reldiff, sigma_reldiff):
-        ave = FuzzyConnectedness.gaussian(FuzzyConnectedness.average(c, d),
-                                          mean_ave,
-                                          sigma_ave)
-
-        rel = FuzzyConnectedness.gaussian(FuzzyConnectedness.relative_difference(c, d),
-                                          mean_reldiff,
-                                          sigma_reldiff)
-        return min(ave, rel)
 
     def run(self):
         # Sanitize inputs
@@ -56,16 +51,16 @@ class FuzzyConnectedness(object):
         seg = np.zeros(padded.shape, dtype=np.float32)
 
         # Get neighboring spel positions of all spels
-        base_ground = []
+        reference_spels = []
         for s in self.seeds:
             for n in get_neighbors(s):
-                base_ground.append(n)
-            base_ground.append(s)
+                reference_spels.append(n)
+            reference_spels.append(s)
 
         # Remove repeats from neighboring positions
         # Curlies turn it into a set (no repeats)
         # Need tuples since lists are unhashable
-        no_repeats = {tuple(row) for row in base_ground}
+        no_repeats = {tuple(row) for row in reference_spels}
 
         # Convert back to ndarray for fancy indexing
         no_repeats = np.array([list(row) for row in no_repeats])
@@ -83,9 +78,8 @@ class FuzzyConnectedness(object):
 
         # Get all ave and reldiff combinations between all base samples
         combs = [c for c in combinations(base_samples, 2)]
-        ave_vals = [FuzzyConnectedness.average(pair[0], pair[1]) for pair in combs]
-        reldiff_vals = \
-            [FuzzyConnectedness.relative_difference(pair[0], pair[1]) for pair in combs if pair[0] != -pair[1]]
+        ave_vals = [average(pair[0], pair[1]) for pair in combs]
+        reldiff_vals = [relative_difference(pair[0], pair[1]) for pair in combs if pair[0] != -pair[1]]
 
         # Calculate means and sigmas
         mean_ave = np.mean(ave_vals)
@@ -114,8 +108,7 @@ class FuzzyConnectedness(object):
                     if e_val == padding_value:
                         continue
 
-                    aff_c_e = FuzzyConnectedness.affinity_one(c_val, e_val, mean_ave, sigma_ave,
-                                                              mean_reldiff, sigma_reldiff)
+                    aff_c_e = affinity_one(c_val, e_val, mean_ave, sigma_ave, mean_reldiff, sigma_reldiff)
 
                     if aff_c_e < self.object_threshold:
                         continue
