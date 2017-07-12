@@ -181,8 +181,17 @@ def get_or_add_default(params, param_name, default):
         return default
 
 
-def zero_crossing_mask(array):
+def mask_zero_crossing(array):
+    # Problem is that we always return an np.array, and inside the loop we need a masked_array
+    # also, += might be weird with masked arrays
+
+    # Also, array here will be the entire phi matrix... I can't reallocate the entire thing every iteration
+
+    # Basically what I need to do is split initialization of the masked array and its iteration. And preferably
+    # update it in place, somehow
+
     res = np.zeros(array.shape, dtype=np.bool)
+    #res = np.ma.masked_array(array)
 
     ax0diff = np.diff(np.signbit(array), axis=0)
     res[1:] += ax0diff
@@ -198,6 +207,28 @@ def zero_crossing_mask(array):
         res[:, :, 1:] += ax2diff
         res[:, :, :-1] += ax2diff
 
+    return res
+
+
+def transform_into_zero_crossing_array(array_to_mask):
+    res = np.ma.masked_array(array_to_mask)
+    mask = np.zeros(array_to_mask.shape, dtype=np.bool)
+
+    ax0diff = np.diff(np.signbit(array_to_mask), axis=0)
+    mask[1:] += ax0diff
+    mask[:-1] += ax0diff
+
+    if res.ndim == 2:
+        ax1diff = np.diff(np.signbit(array_to_mask), axis=1)
+        mask[:, 1:] += ax1diff
+        mask[:, :-1] += ax1diff
+
+    if res.ndim == 3:
+        ax2diff = np.diff(np.signbit(array_to_mask), axis=2)
+        mask[:, :, 1:] += ax2diff
+        mask[:, :, :-1] += ax2diff
+
+    res.mask = ~mask  # Need to explicitly set the array, else it will equal 'False' at the start
     return res
 
 
@@ -281,18 +312,13 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     if profile:
         start_time = time.time()
 
+    # Prepare edge indicator function and its gradient (note: g itself also secretely uses gradients)
     g = edge_indicator2(image, sigma)
     [vz, vy, vx] = np.gradient(g)
 
-    #multiplica phi com phi deslocado 1 pra esquerda, depois usa np.sign. Onde sign = -1, é um zero-crossing point
-    #mesmo vertical
-    #cria uma mascara se sign_hor é -1 ou sign_vert é -1 --> Z
-    #dilate mask em 1
-    #use np.ma
-
-    phi_mask = zero_crossing_mask(phi)
-    phi_mask = binary_dilation(phi_mask)
-    phi_masked = np.ma.masked_array(phi, ~phi_mask)
+    # Prepare narrowband mask
+    phi_masked = transform_into_zero_crossing_array(phi)
+    phi_masked.mask = ~binary_dilation(~phi_masked.mask, iterations=2)  # dilation expands the Trues (the hidden values)
 
     for i in range(max_iter):
         vn_bounds(phi_masked)
@@ -320,12 +346,10 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         phi_masked += delta_t * (r_term + l_term + a_term)
 
         # Update binary mask
-        new_mask = zero_crossing_mask(phi_masked) # ???
-        new_mask = binary_dilation(new_mask)
+        new_mask = zero_crossing_mask(phi_masked).mask  # phi_masked is a masked_array, always
+        new_mask = binary_dilation(~new_mask)
         new_spels = new_mask & ~phi_mask
         phi[new_spels] =
-
-        check this http://cs.au.dk/~tgk/courses/LevelSets/LevelSet.pdf
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:
