@@ -322,10 +322,10 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
     for i in range(max_iter):
         vn_bounds(phi_masked)
-        phi_z, phi_y, phi_x = np.gradient(phi_masked)
-        s = magnitude_of_gradient([phi_z, phi_y, phi_x])
+        phi_z, phi_y, phi_x = np.gradient(phi)  # todo: fixme
+        s = np.ma.masked_array(magnitude_of_gradient([phi_z, phi_y, phi_x]), phi_masked.mask)
 
-        nx = phi_x / (s + 0.0000001)
+        nx = phi_x / (s + 0.0000001) # ndarray times masked_array gives a masked_array. Arithmetic was only applied on the unmasked
         ny = phi_y / (s + 0.0000001)
         nz = phi_z / (s + 0.0000001)
 
