@@ -133,21 +133,12 @@ def test_fuzzy_connectedness():
 
 
 def test_level_sets():
-    datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\ct_head_ex - Mangled")
+    datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\Testseries")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
-
-    other_arr = np.zeros([50, 50, 10])
-
-    (width, height, depth) = other_arr.shape
-    for x in range(width):
-        for y in range(height):
-            for z in range(depth):
-                if x > 10 and x < 30 and y > 10 and y < 30 and z > 2 and z <= 5:
-                    other_arr[x, y, z] = 100
 
     level_set_params = {'alpha': -5.0, 'lamb': 5.0, 'mu': 0.1, 'sigma': 0.5, 'epsilon': 1.5, 'delta_t': 1.0}
     phi = level_sets(series_arr, level_set_params,
-                     num_iter_to_update_plot=1, phi=None, max_iter=100, plot=True, profile=True)
+                     num_iter_to_update_plot=50, phi=None, max_iter=10000, plot=True, profile=True)
 
 
 # @profile_func

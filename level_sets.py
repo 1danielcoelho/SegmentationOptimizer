@@ -139,7 +139,14 @@ def div(f):
 
 
 def div2d(nx, ny):
-    _, nxx = np.gradient(nx)
+    """
+    Alternative divergence operator restricted to 2D I found online. Calculates the divergence of a 2D vector field,
+    corresponding to dFx/dx + dFy/dy
+    :param nx: First dimension of the vector field, in the X direction
+    :param ny: Second dimension of the vector field, in the Y direction
+    :return: Single ndarray of the same shape as nx or ny, which represents a scalar field containing the divergence
+    """
+    _, nxx = np.gradient(nx)  # Gradient spits out [vertical, horizontal], that is, first the variation between rows
     nyy, _ = np.gradient(ny)
     return nxx + nyy
 
@@ -165,12 +172,16 @@ def draw_circle(array, center, radius, inside, outside):
 
 
 def vn_bounds(phi):
-    phi[0, :, :] = phi[1, :, :]
-    phi[-1, :, :] = phi[-2, :, :]
-    phi[:, 0, :] = phi[:, 1, :]
-    phi[:, -1, :] = phi[:, -2, :]
-    phi[:, :, 0] = phi[:, :, 1]
-    phi[:, :, -1] = phi[:, :, -2]
+    phi[0] = phi[1]
+    phi[-1] = phi[-2]
+
+    if phi.ndim == 2:
+        phi[:, 0] = phi[:, 1]
+        phi[:, -1] = phi[:, -2]
+
+    if phi.ndim == 3:
+        phi[:, :, 0] = phi[:, :, 1]
+        phi[:, :, -1] = phi[:, :, -2]
 
 
 def get_or_add_default(params, param_name, default):
@@ -181,17 +192,8 @@ def get_or_add_default(params, param_name, default):
         return default
 
 
-def mask_zero_crossing(array):
-    # Problem is that we always return an np.array, and inside the loop we need a masked_array
-    # also, += might be weird with masked arrays
-
-    # Also, array here will be the entire phi matrix... I can't reallocate the entire thing every iteration
-
-    # Basically what I need to do is split initialization of the masked array and its iteration. And preferably
-    # update it in place, somehow
-
+def zero_crossing_mask(array):
     res = np.zeros(array.shape, dtype=np.bool)
-    #res = np.ma.masked_array(array)
 
     ax0diff = np.diff(np.signbit(array), axis=0)
     res[1:] += ax0diff
@@ -207,28 +209,6 @@ def mask_zero_crossing(array):
         res[:, :, 1:] += ax2diff
         res[:, :, :-1] += ax2diff
 
-    return res
-
-
-def transform_into_zero_crossing_array(array_to_mask):
-    res = np.ma.masked_array(array_to_mask)
-    mask = np.zeros(array_to_mask.shape, dtype=np.bool)
-
-    ax0diff = np.diff(np.signbit(array_to_mask), axis=0)
-    mask[1:] += ax0diff
-    mask[:-1] += ax0diff
-
-    if res.ndim == 2:
-        ax1diff = np.diff(np.signbit(array_to_mask), axis=1)
-        mask[:, 1:] += ax1diff
-        mask[:, :-1] += ax1diff
-
-    if res.ndim == 3:
-        ax2diff = np.diff(np.signbit(array_to_mask), axis=2)
-        mask[:, :, 1:] += ax2diff
-        mask[:, :, :-1] += ax2diff
-
-    res.mask = ~mask  # Need to explicitly set the array, else it will equal 'False' at the start
     return res
 
 
@@ -259,21 +239,21 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     :return: Final 'phi' once the algorithm is complete. The zero-level contour corresponds to the final segmentation
     """
 
-    # Extract params from 'params' or get default values, and insert them into params
-    alpha = get_or_add_default(params, 'alpha', -5.0)
-    lamb = get_or_add_default(params, 'lamb', 5.0)
-    mu = get_or_add_default(params, 'mu', 0.1)
-    sigma = get_or_add_default(params, 'sigma', 0.5)
-    epsilon = get_or_add_default(params, 'epsilon', 1.5)
-    delta_t = get_or_add_default(params, 'delta_t', 1.0)
-
     # Sanitize inputs
     try:
+        # Extract params from 'params' or get default values, and insert them into params
+        alpha = get_or_add_default(params, 'alpha', -5.0)
+        lamb = get_or_add_default(params, 'lamb', 5.0)
+        mu = get_or_add_default(params, 'mu', 0.1)
+        sigma = get_or_add_default(params, 'sigma', 0.5)
+        epsilon = get_or_add_default(params, 'epsilon', 1.5)
+        delta_t = get_or_add_default(params, 'delta_t', 1.0)
+
         check_ndimage(image)
 
         if phi is None:
             phi = 2 * np.ones(image.shape, dtype=np.float64)
-            phi[120:150, 120:150, 3:6] = -2
+            phi[120:150, 120:150] = -2
         else:
             check_ndimage(phi)
 
@@ -282,6 +262,11 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
         if mu * delta_t >= 0.25:
             print('WARNING: mu and delta_t do not satisfy CFL condition for numerical stability (mu * delta_t < 0.25)')
+
+        if image.ndim == 2:
+            if plot_slice != 0:
+                print('WARNING: image is 2D, but plot_slice is different to 0! plot_slice will be set to 0')
+            plot_slice = 0
     except:
         raise  # re-raises last exception
 
@@ -308,48 +293,41 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         plt.show(block=False)
         plt.pause(0.001)
 
+    # Start profiling if necessary
     start_time = 0
     if profile:
         start_time = time.time()
 
     # Prepare edge indicator function and its gradient (note: g itself also secretely uses gradients)
     g = edge_indicator2(image, sigma)
-    [vz, vy, vx] = np.gradient(g)
+    g_grad = np.array(np.gradient(g))
 
-    # Prepare narrowband mask
-    phi_masked = transform_into_zero_crossing_array(phi)
-    phi_masked.mask = ~binary_dilation(~phi_masked.mask, iterations=2)  # dilation expands the Trues (the hidden values)
+    # Prepare narrowband mask, where True marks the narrowband spels
+    # phi_mask = zero_crossing_mask(phi)
+    # phi_mask = binary_dilation(phi_mask, iterations=2)
 
     for i in range(max_iter):
-        vn_bounds(phi_masked)
-        phi_z, phi_y, phi_x = np.gradient(phi)  # todo: fixme
-        s = np.ma.masked_array(magnitude_of_gradient([phi_z, phi_y, phi_x]), phi_masked.mask)
+        vn_bounds(phi)
 
-        nx = phi_x / (s + 0.0000001) # ndarray times masked_array gives a masked_array. Arithmetic was only applied on the unmasked
-        ny = phi_y / (s + 0.0000001)
-        nz = phi_z / (s + 0.0000001)
+        phi_grad = np.gradient(phi)
+        phi_grad_mag = magnitude_of_gradient(phi_grad)
+        normalized_phi_grad = phi_grad / (phi_grad_mag + 0.0000001)
 
-        curvature = div([nz, ny, nx])
+        curvature = div(normalized_phi_grad)
 
-        dirac = delta_operator(phi_masked, epsilon)
+        dirac = delta_operator(phi, epsilon)
 
         # Compute stuff for distance regularization term
-        a = (s >= 0.0) & (s <= 1.0)
-        b = (s > 1.0)
-        ps = a * np.sin(2.0*np.pi*s) / (2.0 * np.pi) + b * (s - 1.0)
-        dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((s != 0.0) * s + (s == 0.0))
+        a = (phi_grad_mag >= 0.0) & (phi_grad_mag <= 1.0)
+        b = (phi_grad_mag > 1.0)
+        ps = a * np.sin(2.0*np.pi*phi_grad_mag) / (2.0 * np.pi) + b * (phi_grad_mag - 1.0)
+        dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((phi_grad_mag != 0.0) * phi_grad_mag + (phi_grad_mag == 0.0))
 
-        r_term = mu * (div([dps * phi_z - phi_z, dps * phi_y - phi_y, dps * phi_x - phi_x]) + ndi.filters.laplace(phi))
-        l_term = lamb * (dirac * (vx * nx + vy * ny + vz * nz) + dirac * g * curvature)
-        a_term = alpha * (g * dirac)
+        r_term = div(dps * phi_grad - phi_grad) + ndi.filters.laplace(phi)
+        l_term = dirac * (sum(g_grad * normalized_phi_grad)) + dirac * g * curvature
+        a_term = g * dirac
 
-        phi_masked += delta_t * (r_term + l_term + a_term)
-
-        # Update binary mask
-        new_mask = zero_crossing_mask(phi_masked).mask  # phi_masked is a masked_array, always
-        new_mask = binary_dilation(~new_mask)
-        new_spels = new_mask & ~phi_mask
-        phi[new_spels] =
+        phi += delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:

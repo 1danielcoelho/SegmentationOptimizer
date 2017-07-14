@@ -60,5 +60,9 @@ def dicom_datasets_to_numpy(datasets):
         # Also performs rescaling. 'unsafe' since it converts from float64 to int32
         np.copyto(series_arr[:, :, i], np.flipud(d.RescaleSlope * d.pixel_array + d.RescaleIntercept), 'unsafe')
 
-    return series_arr, (x, y, z)
+    # Hack so that we don't return a size [256, 256, 1] ndarray and confuse code that expects a size [256, 256]
+    if img_dims[2] == 1:
+        return series_arr[:, :, 0], (x, y)
+    else:
+        return series_arr, (x, y, z)
 
