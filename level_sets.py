@@ -212,6 +212,10 @@ def zero_crossing_mask(array):
     return res
 
 
+def get_band_indices_1d(image, band_thickness):
+    return np.where(abs(image.ravel()) < (band_thickness/2.0))
+
+
 def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=10,
                plot=False, plot_slice=0, profile=False):
     """
@@ -252,14 +256,14 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         check_ndimage(image)
 
         if phi is None:
-            phi = 2 * np.ones(image.shape, dtype=np.float64)
+            phi = 10 * np.ones(image.shape, dtype=np.float64)
             middle = np.array(phi.shape) / 2.0
 
-            phi[middle[0] - 10: middle[0] + 10, middle[1] - 10: middle[1] + 10] = -2
-            phi[:, :2] = -2
-            phi[:, -2:] = -2
-            phi[:2, :] = -2
-            phi[-2:, :] = -2
+            phi[middle[0] - 10: middle[0] + 10, middle[1] - 10: middle[1] + 10] = -10
+            phi[:, :2] = -10
+            phi[:, -2:] = -10
+            phi[:2, :] = -10
+            phi[-2:, :] = -10
         else:
             check_ndimage(phi)
 
@@ -309,8 +313,7 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     g_grad = np.array(np.gradient(g))
 
     # Prepare narrowband mask, where True marks the narrowband spels
-    phi_mask = zero_crossing_mask(phi)
-    phi_mask = binary_dilation(phi_mask, iterations=2)
+    narrowband = get_band_indices_1d(phi, 3)  # All indices where abs(phi) <= 3
 
     for i in range(max_iter):
         vn_bounds(phi)
