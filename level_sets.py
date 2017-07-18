@@ -253,7 +253,13 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
         if phi is None:
             phi = 2 * np.ones(image.shape, dtype=np.float64)
-            phi[120:150, 120:150] = -2
+            middle = np.array(phi.shape) / 2.0
+
+            phi[middle[0] - 10: middle[0] + 10, middle[1] - 10: middle[1] + 10] = -2
+            phi[:, :2] = -2
+            phi[:, -2:] = -2
+            phi[:2, :] = -2
+            phi[-2:, :] = -2
         else:
             check_ndimage(phi)
 
