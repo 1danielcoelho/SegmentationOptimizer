@@ -309,8 +309,8 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     g_grad = np.array(np.gradient(g))
 
     # Prepare narrowband mask, where True marks the narrowband spels
-    # phi_mask = zero_crossing_mask(phi)
-    # phi_mask = binary_dilation(phi_mask, iterations=2)
+    phi_mask = zero_crossing_mask(phi)
+    phi_mask = binary_dilation(phi_mask, iterations=2)
 
     for i in range(max_iter):
         vn_bounds(phi)
@@ -330,7 +330,7 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((phi_grad_mag != 0.0) * phi_grad_mag + (phi_grad_mag == 0.0))
 
         r_term = div(dps * phi_grad - phi_grad) + ndi.filters.laplace(phi)
-        l_term = dirac * (sum(g_grad * normalized_phi_grad)) + dirac * g * curvature
+        l_term = dirac * (sum(g_grad * normalized_phi_grad) + g * curvature)
         a_term = g * dirac
 
         phi += delta_t * (mu * r_term + lamb * l_term + alpha * a_term)

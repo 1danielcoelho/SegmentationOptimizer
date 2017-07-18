@@ -136,21 +136,18 @@ def test_level_sets():
     datasets = load_dicom_folder(r"C:\Users\Daniel\Dropbox\DICOM series\Testseries")
     series_arr, _ = dicom_datasets_to_numpy(datasets)
 
-    quick_plot(series_arr)
-
     series_arr = bake_windowing(series_arr, min_value=1000, max_value=2000, scale=1000)
-
-    quick_plot(series_arr)
 
     level_set_params = {'alpha': -5.0, 'lamb': 1.0, 'mu': 0.1, 'sigma': 1.5, 'epsilon': 1.5, 'delta_t': 1.0}
     phi = level_sets(series_arr, level_set_params,
-                     num_iter_to_update_plot=50, phi=None, max_iter=10000, plot=True, profile=True)
+                     num_iter_to_update_plot=5000000, phi=None, max_iter=1000, plot=False, profile=True)
 
 
 def bake_windowing(series, min_value, max_value, scale):
     """
     Remaps the series to the [0, scale] range, using the windowing parameters passed in. Values outside the window
     are mapped to 0 or scale
+    :param series: ndarray to bake windowing into
     :param min_value: Smallest pixel value allowed in the window
     :param max_value: Largest pixel value allowed in the window
     :param scale: Largest value of the remapped series
@@ -169,7 +166,7 @@ def bake_windowing(series, min_value, max_value, scale):
     return res
 
 
-# @profile_func
+@profile_func
 def main():
     # np.seterr(all='raise')
     # test_fuzzy_connectedness()
