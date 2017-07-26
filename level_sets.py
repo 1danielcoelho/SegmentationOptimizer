@@ -151,6 +151,36 @@ def div2d(nx, ny):
     return nxx + nyy
 
 
+def get_band_indices_1d(image, band_thickness):
+    """
+    Gets the 1d (ravel'd) indices of the spels in the narrowband, assuming the image is a distance function to the
+    zero level set
+    :param image: n-dimensional ndarray of a distance function to a zero level set
+    :param band_thickness: thickness of the entire band in 'image'
+    :return: 1d ndarray with the indices of the narrowband spels of the ravel'd image
+    """
+    return np.where(abs(image.ravel()) <= (band_thickness/2.0))[0]
+
+
+def gradient_at_points(image, indices_1d):
+    """
+    Calculates the x,y gradients at certain spels of 'image'. The target spels are passed in a 1d array of 1d (ravel'd)
+    indices, 'indices_1d'. The gradient is calculated by doing 0.5 * (image[pos + 1] - image[pos - 1]) for the x direction,
+    and 0.5 * (image[pos + width] - image[pos - width]) for the y direction. Produces garbage at the edge pixels
+    :param image: 2d ndarray to calculate the gradient of
+    :param indices_1d: 1d ndarray with the indices of the spels of the ravel'd image to calculate the gradient of
+    :return: list of two ndarrays, [grad_y, grad_x], where those are ndarrays of the vertical and horizontal gradients
+    """
+    width = image.shape[1]
+
+    raveled_image = image.ravel()
+
+    res_x = 0.5 * (raveled_image.take(indices_1d + 1, mode='wrap') - raveled_image.take(indices_1d - 1, mode='wrap'))
+    res_y = 0.5 * (raveled_image.take(indices_1d + width, mode='wrap') - raveled_image.take(indices_1d - width, mode='wrap'))
+
+    return [res_y, res_x]
+
+
 def draw_circle(array, center, radius, inside, outside):
     a, b, c = center
     mask = []

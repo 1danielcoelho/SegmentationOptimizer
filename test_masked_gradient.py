@@ -5,7 +5,7 @@ from timeit_context import timeit_context
 
 
 def get_band_indices_1d(image, band_thickness):
-    return np.where(abs(image.reshape(-1)) <= (band_thickness/2.0))[0]
+    return np.where(abs(image.ravel()) <= (band_thickness/2.0))[0]
 
 
 def gradient_at_points1(image, indices_1d):
@@ -60,6 +60,8 @@ a[-1, :] = 99
 
 indices = get_band_indices_1d(a, 5)
 
+mask = (a > -2.5) & (a < 2.5)
+
 # grad1 = np.gradient(a)[0]
 # grad2 = gradient_at_points(image=a, indices_1d=indices)[0]
 #
@@ -74,24 +76,31 @@ indices = get_band_indices_1d(a, 5)
 
 
 with timeit_context('full gradient'):
-    for i1 in range(100):
+    for i in range(100):
         grad1 = np.gradient(a)
 
+ma = np.ma.masked_array(a, mask)
+
+with timeit_context('With masked_array'):
+    for im in range(100):
+        grad6 = np.gradient(ma)
+
 with timeit_context('gradient at points 1'):
-    for i2 in range(100):
+    for i1 in range(100):
         grad2 = gradient_at_points1(image=a, indices_1d=indices)
 
 with timeit_context('gradient at points 2'):
-    for i3 in range(100):
+    for i2 in range(100):
         grad3 = gradient_at_points2(image=a, indices_1d=indices)
 
 with timeit_context('gradient at points 3'):
-    for i4 in range(100):
+    for i3 in range(100):
         grad4 = gradient_at_points3(image=a, indices_1d=indices)
 
-with timeit_context('gradient at points 3'):
-    for i5 in range(100):
+with timeit_context('gradient at points 4'):
+    for i4 in range(100):
         grad5 = gradient_at_points4(image=a, indices_1d=indices)
+
 
 # print(a)
 # print(np.gradient(a))
@@ -101,3 +110,4 @@ print(grad2)
 print(grad3)
 print(grad4)
 print(grad5)
+print(grad6)
