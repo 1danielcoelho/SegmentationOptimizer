@@ -87,36 +87,37 @@ def edge_indicator2(i, sigma):
     return 1.0 / (1.0 + mag_grad**2)
 
 
-def delta_operator(x, epsilon):
+def delta_operator(x, epsilon, indices_1d):
     """
     Discrete Diract delta function. Corresponds to:
         delta(x) = 1/(2*epsilon) * (1 + cos(pi * x / epsilon)), if abs(x) <= epsilon
         delta(x) = 0, if abs(x) > epsilon
     :param x: 3d ndarray of floats
-    :param epsilon: float
+    :param epsilon: float used for the formula
+    :param indices_1d: 1d ndarray with the indices of the spels to calculate the delta operator with
     :return: 3d ndarray of floats of the same shape as x
     """
     f = (0.5 / epsilon) * (1.0 + np.cos(np.pi * x / epsilon))
-    b = (x <= epsilon) & (x >= -epsilon)
+    b = abs(x.take(indices_1d)) <= epsilon
     return f * b
 
-
-def dp(s):
-    """
-    Corresponds to d_p2(s) = p2'(s)/s. To avoid NANs, this function is split into three:
-        dp(s) = 1, if s = 0
-        dp(s) = (1/(2pi*s) * sin(2pi*s), if 0 < s < 1
-        dp(s) = 1 - 1/s, if s >= 1
-    :param s: 3d ndarray of floats
-    :return: 3d ndarray of floats of the same shape as s
-    """
-    res = np.ones(s.shape, dtype=np.float64)
-    less_mask = (0 < s) & (s < 1)
-    larger_mask = s >= 1
-
-    res[less_mask] = np.sin(2 * np.pi * s[less_mask]) / (2 * np.pi * s[less_mask])
-    res[larger_mask] = 1.0 - 1.0 / s[larger_mask]
-    return res
+#
+# def dp(s):
+#     """
+#     Corresponds to d_p2(s) = p2'(s)/s. To avoid NANs, this function is split into three:
+#         dp(s) = 1, if s = 0
+#         dp(s) = (1/(2pi*s) * sin(2pi*s), if 0 < s < 1
+#         dp(s) = 1 - 1/s, if s >= 1
+#     :param s: 3d ndarray of floats
+#     :return: 3d ndarray of floats of the same shape as s
+#     """
+#     res = np.ones(s.shape, dtype=np.float64)
+#     less_mask = (0 < s) & (s < 1)
+#     larger_mask = s >= 1
+#
+#     res[less_mask] = np.sin(2 * np.pi * s[less_mask]) / (2 * np.pi * s[less_mask])
+#     res[larger_mask] = 1.0 - 1.0 / s[larger_mask]
+#     return res
 
 
 def magnitude_of_gradient(grad_f):
@@ -128,27 +129,16 @@ def magnitude_of_gradient(grad_f):
     return np.sqrt(np.ufunc.reduce(np.add, [x**2 for x in grad_f]))
 
 
-def div(f):
+def div_at_points(f, indices_1d):
     """
     Computes the divergence of the vector field f, corresponding to dFx/dx + dFy/dy + ...
     :param f: List of ndarrays, where every item of the list is one dimension of the vector field
-    :return: Single ndarray of the same shape as each of the items in f, which corresponds to a scalar field
+    :param indices_1d: 1d ndarray with the indices of the spels to calculate the divergence operator with
+    :return: 1d ndarray with the size of indices_1d containing the divergence operator for the spels at those indices
     """
-    num_dims = len(f)
-    return np.ufunc.reduce(np.add, [np.gradient(f[i], axis=i) for i in range(num_dims)])
-
-
-def div2d(nx, ny):
-    """
-    Alternative divergence operator restricted to 2D I found online. Calculates the divergence of a 2D vector field,
-    corresponding to dFx/dx + dFy/dy
-    :param nx: First dimension of the vector field, in the X direction
-    :param ny: Second dimension of the vector field, in the Y direction
-    :return: Single ndarray of the same shape as nx or ny, which represents a scalar field containing the divergence
-    """
-    _, nxx = np.gradient(nx)  # Gradient spits out [vertical, horizontal], that is, first the variation between rows
-    nyy, _ = np.gradient(ny)
-    return nxx + nyy
+    xx = gradient_at_points(f[0], indices_1d, axis=0)
+    yy = gradient_at_points(f[1], indices_1d, axis=1)
+    return xx + yy
 
 
 def get_band_indices_1d(image, band_thickness):
@@ -162,43 +152,33 @@ def get_band_indices_1d(image, band_thickness):
     return np.where(abs(image.ravel()) <= (band_thickness/2.0))[0]
 
 
-def gradient_at_points(image, indices_1d):
+def gradient_at_points(image, indices_1d, axis=-1):
     """
     Calculates the x,y gradients at certain spels of 'image'. The target spels are passed in a 1d array of 1d (ravel'd)
     indices, 'indices_1d'. The gradient is calculated by doing 0.5 * (image[pos + 1] - image[pos - 1]) for the x direction,
     and 0.5 * (image[pos + width] - image[pos - width]) for the y direction. Produces garbage at the edge pixels
     :param image: 2d ndarray to calculate the gradient of
     :param indices_1d: 1d ndarray with the indices of the spels of the ravel'd image to calculate the gradient of
-    :return: list of two ndarrays, [grad_y, grad_x], where those are ndarrays of the vertical and horizontal gradients
+    :param axis: axis to take the gradient in. axis=0 means the x axis (horizontal gradient), 1 means the vertical axis.
+    -1 will calculate for both
+    :return: list of ndarrays, with the length of indices_1d, containing the gradient of the spels at those indices.
+    Will contain [grad_x] for axis=0, [grad_y] for axis=1 or [grad_y, grad_x] for axis=-1
     """
     width = image.shape[1]
+    rav_img = image.ravel()
 
-    raveled_image = image.ravel()
-
-    res_x = 0.5 * (raveled_image.take(indices_1d + 1, mode='wrap') - raveled_image.take(indices_1d - 1, mode='wrap'))
-    res_y = 0.5 * (raveled_image.take(indices_1d + width, mode='wrap') - raveled_image.take(indices_1d - width, mode='wrap'))
-
-    return [res_y, res_x]
-
-
-def draw_circle(array, center, radius, inside, outside):
-    a, b, c = center
-    mask = []
-
-    if array.ndim == 2:
-        nx, ny = array.shape
-        y, x = np.ogrid[-a:nx - a, -b:ny - b]
-        mask = x * x + y * y <= radius * radius
-
-    elif array.ndim == 3:
-        nx, ny, nz = array.shape
-        z, y, x = np.ogrid[-a:nx - a, -b:ny - b, -c:nz - c]
-        mask = x * x + y * y + z * z <= radius * radius
-
-    array[~mask] = outside
-    array[mask] = inside
-
-    return array
+    if axis == -1:
+        res_x = 0.5 * (rav_img.take(indices_1d + 1, mode='wrap') - rav_img.take(indices_1d - 1, mode='wrap'))
+        res_y = 0.5 * (rav_img.take(indices_1d + width, mode='wrap') - rav_img.take(indices_1d - width, mode='wrap'))
+        return [res_y, res_x]
+    elif axis == 0:
+        res_x = 0.5 * (rav_img.take(indices_1d + 1, mode='wrap') - rav_img.take(indices_1d - 1, mode='wrap'))
+        return [res_x]
+    elif axis == 1:
+        res_y = 0.5 * (rav_img.take(indices_1d + width, mode='wrap') - rav_img.take(indices_1d - width, mode='wrap'))
+        return [res_y]
+    else:
+        raise AttributeError('Invalid axis for gradient_at_points: ' + str(axis) + '. Pick 0, 1 or -1.')
 
 
 def vn_bounds(phi):
@@ -220,30 +200,6 @@ def get_or_add_default(params, param_name, default):
     else:
         params[param_name] = default
         return default
-
-
-def zero_crossing_mask(array):
-    res = np.zeros(array.shape, dtype=np.bool)
-
-    ax0diff = np.diff(np.signbit(array), axis=0)
-    res[1:] += ax0diff
-    res[:-1] += ax0diff
-
-    if res.ndim == 2:
-        ax1diff = np.diff(np.signbit(array), axis=1)
-        res[:, 1:] += ax1diff
-        res[:, :-1] += ax1diff
-
-    if res.ndim == 3:
-        ax2diff = np.diff(np.signbit(array), axis=2)
-        res[:, :, 1:] += ax2diff
-        res[:, :, :-1] += ax2diff
-
-    return res
-
-
-def get_band_indices_1d(image, band_thickness):
-    return np.where(abs(image.ravel()) < (band_thickness/2.0))
 
 
 def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=10,
@@ -343,18 +299,20 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     g_grad = np.array(np.gradient(g))
 
     # Prepare narrowband mask, where True marks the narrowband spels
-    narrowband = get_band_indices_1d(phi, 3)  # All indices where abs(phi) <= 3
+    narrowband = get_band_indices_1d(phi, 5)  # All indices where abs(phi) <= 3
 
     for i in range(max_iter):
         vn_bounds(phi)
 
-        phi_grad = np.gradient(phi)
+        # TODO: phi_grad and phi_grad_mag need to be 1 spel thicker than the narrowband
+        # Use dilate_band5 to get a thicker narrowband, calculate phi_grad and norm_phi_grad with it
+        phi_grad = gradient_at_points(phi, narrowband)
         phi_grad_mag = magnitude_of_gradient(phi_grad)
         normalized_phi_grad = phi_grad / (phi_grad_mag + 0.0000001)
 
-        curvature = div(normalized_phi_grad)
+        curvature = div_at_points(normalized_phi_grad, narrowband)
 
-        dirac = delta_operator(phi, epsilon)
+        dirac = delta_operator(phi, epsilon, narrowband)
 
         # Compute stuff for distance regularization term
         a = (phi_grad_mag >= 0.0) & (phi_grad_mag <= 1.0)
@@ -362,11 +320,19 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         ps = a * np.sin(2.0*np.pi*phi_grad_mag) / (2.0 * np.pi) + b * (phi_grad_mag - 1.0)
         dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((phi_grad_mag != 0.0) * phi_grad_mag + (phi_grad_mag == 0.0))
 
-        r_term = div(dps * phi_grad - phi_grad) + ndi.filters.laplace(phi)
+        # TODO: Fix since it will never work. div_at_points receives just a 1D array of gradients at the positions dictated by the narrowband indices. It needs gradients though so it needs to fetch neighbors
+        # TODO: laplace filter for narrowband positions (similar to how gradient is implemented)
+        r_term = div_at_points(dps * phi_grad - phi_grad, narrowband) + ndi.filters.laplace(phi)
+
+        # TODO: g is the full image here, need to take at narrowband indices
         l_term = dirac * (sum(g_grad * normalized_phi_grad) + g * curvature)
         a_term = g * dirac
 
+        # Todo: right side is 1d array, need reverse of .take using narrowband indices
         phi += delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
+
+        # TODO: Maybe use the previous band to optimize this update?
+        narrowband = get_band_indices_1d(phi, 5)
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:
