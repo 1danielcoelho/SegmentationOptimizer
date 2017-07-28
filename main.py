@@ -6,6 +6,7 @@ from copy import copy
 from open import dicom_datasets_to_numpy, load_dicom_folder
 from region_growing import RegionGrowing
 from fuzzy_connectedness import FuzzyConnectedness
+from level_sets_nb import level_sets as level_sets_nb
 from level_sets import level_sets
 from profile_func import profile_func
 
@@ -139,8 +140,11 @@ def test_level_sets():
     series_arr = bake_windowing(series_arr, min_value=1000, max_value=2000, scale=1000)
 
     level_set_params = {'alpha': -5.0, 'lamb': 1.0, 'mu': 0.1, 'sigma': 1.5, 'epsilon': 1.5, 'delta_t': 1.0}
-    phi = level_sets(series_arr, level_set_params,
-                     num_iter_to_update_plot=10, phi=None, max_iter=1000, plot=True, profile=True)
+    # phi = level_sets(series_arr, level_set_params,
+    #                  num_iter_to_update_plot=100, phi=None, max_iter=5, plot=True, profile=True)
+
+    phi = level_sets_nb(series_arr, level_set_params,
+                        num_iter_to_update_plot=100, phi=None, max_iter=10000, plot=True, profile=True)
 
 
 def bake_windowing(series, min_value, max_value, scale):

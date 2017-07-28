@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.ndimage.morphology import binary_dilation
-from level_sets import magnitude_of_gradient, zero_crossing_mask
+from level_sets_nb import magnitude_of_gradient, zero_crossing_mask
 from timeit_context import timeit_context
 
 arr = np.zeros([8, 8])
