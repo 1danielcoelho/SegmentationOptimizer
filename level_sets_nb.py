@@ -106,8 +106,8 @@ def div_at_indices(f, indices_1d):
     :param indices_1d: 1d ndarray with the indices of the spels to calculate the divergence operator with
     :return: 1d ndarray with the size of indices_1d containing the divergence operator for the spels at those indices
     """
-    xx = gradient_at_indices(f[0], indices_1d, axis=0)
-    yy = gradient_at_indices(f[1], indices_1d, axis=1)
+    xx = gradient_at_indices(f[0], indices_1d, axis=1)
+    yy = gradient_at_indices(f[1], indices_1d, axis=0)
     return xx + yy
 
 
@@ -154,15 +154,17 @@ def gradient_at_indices(image, indices_1d, axis=-1):
 def dilate_band(indices_1d, width):
     num_indices = indices_1d.size
 
+    # Build an array with 5 times as many indices as num_indices, by replicating indices_1d 5 times
     new_arr = np.tile(indices_1d, 5)
 
+    # Change the 4 other replications to contain the neighbors in each direction
     new_arr[1 * num_indices:2 * num_indices] += 1
     new_arr[2 * num_indices:3 * num_indices] -= 1
     new_arr[3 * num_indices:4 * num_indices] += width
     new_arr[4 * num_indices:5 * num_indices] -= width
 
+    # Return each neighbor only once
     uniques = np.unique(new_arr)
-
     return uniques
 
 
@@ -298,10 +300,18 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
     # Initialize the band
     # Prepare narrowband mask, where True marks the narrowband spels
-    zero_crossing = get_band_indices_1d(phi, 5)
-    nb_indices = dilate_band(zero_crossing, image.shape[1])
-    nb_indices = dilate_band(nb_indices, image.shape[1])
-    nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
+    zero_crossing = get_band_indices_1d(phi, 50)
+    nb_indices = zero_crossing
+    nb_fringed_indices = zero_crossing
+    # nb_indices = dilate_band(zero_crossing, image.shape[1])
+    # nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
+
+    # testimg = np.zeros_like(image)
+    # testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
+    # testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
+    # testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
+    #
+    # quick_plot(testimg, 'initial nb')
 
     for i in range(max_iter):
         # Make image edges well behaved
@@ -310,52 +320,55 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         nb_2d_indices = np.unravel_index(nb_indices, image.shape)
         nb_fringed_2d_indices = np.unravel_index(nb_fringed_indices, image.shape)
 
-        phi_grad_1d_yx = gradient_at_indices(phi, nb_fringed_indices)
+        phi_grad_1d_yx = gradient_at_indices(phi, nb_fringed_indices) # ok
 
         # TODO: Remove this once I find a better way of getting the laplacian for r_term
-        phi_grad_2d[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0]
-        phi_grad_2d[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1]
+        phi_grad_2d[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0]  # ok
+        phi_grad_2d[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1]  # ok
 
-        phi_grad_1d_mag = magnitude_of_gradient(phi_grad_1d_yx)
-        phi_grad_2d_norm[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0] / (phi_grad_1d_mag + 0.0000001)
-        phi_grad_2d_norm[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1] / (phi_grad_1d_mag + 0.0000001)
+        phi_grad_1d_mag = magnitude_of_gradient(phi_grad_1d_yx)  # ok
+        phi_grad_2d_norm[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0] / (phi_grad_1d_mag + 0.0000001)  # ok
+        phi_grad_2d_norm[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1] / (phi_grad_1d_mag + 0.0000001)  # ok
 
-        curvature_1d = div_at_indices(phi_grad_2d_norm, nb_indices)
+        curvature_1d = div_at_indices(phi_grad_2d_norm, nb_indices)  # ok
 
-        delta_1d = delta_operator(phi, epsilon, nb_indices)
+        delta_1d = delta_operator(phi, epsilon, nb_indices)  # ok
 
         # Compute stuff for distance regularization term
         a = (phi_grad_1d_mag >= 0.0) & (phi_grad_1d_mag <= 1.0)
         b = (phi_grad_1d_mag > 1.0)
         ps = a * np.sin(2.0*np.pi*phi_grad_1d_mag) / (2.0 * np.pi) + b * (phi_grad_1d_mag - 1.0)
-        dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((phi_grad_1d_mag != 0.0) * phi_grad_1d_mag + (phi_grad_1d_mag == 0.0))
+        dps = ((ps != 0.0) * ps + (ps == 0.0)) / ((phi_grad_1d_mag != 0.0) * phi_grad_1d_mag + (phi_grad_1d_mag == 0.0))  # ok
 
         dps_2d[0][nb_fringed_2d_indices] = dps * phi_grad_1d_yx[0] - phi_grad_1d_yx[0]
         dps_2d[1][nb_fringed_2d_indices] = dps * phi_grad_1d_yx[1] - phi_grad_1d_yx[1]
 
-        g_nb = g.take(nb_indices)
+        g_nb = g[nb_2d_indices]
 
         # Maybe this laplace filter doesn't work?
-        r_term = div_at_indices(dps_2d, nb_indices) + div_at_indices(phi_grad_2d, nb_indices)
+        laplace = ndi.filters.laplace(phi)[nb_2d_indices]
+
+        r_term = div_at_indices(dps_2d, nb_indices) + laplace  # ok
         l_term = delta_1d * \
                  (g_grad[0].take(nb_indices) * phi_grad_2d_norm[0].take(nb_indices) +
                   g_grad[1].take(nb_indices) * phi_grad_2d_norm[1].take(nb_indices) +
-                  g_nb * curvature_1d)
+                  g_nb * curvature_1d)  # ok
+        a_term = g_nb * delta_1d  # ok
 
-        a_term = g_nb * delta_1d
+        increment = delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
 
-        # quick_plot(r_term_2d, 'r_term, nb')
-        # quick_plot(l_term_2d, 'l_term, nb')
-        # quick_plot(a_term_2d, 'a_term, nb')
+        # This works
+        phi[nb_2d_indices] += increment
 
-        phi[nb_2d_indices] += delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
+        zero_crossing = get_band_indices_1d(phi, 50)
+        nb_indices = zero_crossing
+        nb_fringed_indices = zero_crossing
 
-        main problem: Narrowband can't move, since only spels within the band itself are updating
-
-        nb_indices = get_band_indices_1d(phi, 5)
-        nb_indices = dilate_band(nb_indices, image.shape[1])
-        nb_indices = dilate_band(nb_indices, image.shape[1])
-        nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
+        # testimg = np.zeros_like(image)
+        # testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
+        # testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
+        # testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
+        # quick_plot(testimg, 'initial nb iter ' + str(i))
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:

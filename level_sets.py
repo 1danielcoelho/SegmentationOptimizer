@@ -354,7 +354,6 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         normalized_phi_grad = phi_grad / (phi_grad_mag + 0.0000001)
 
         curvature = div(normalized_phi_grad)
-        quick_plot(normalized_phi_grad[0], 'xx of curvature, normal')
 
         dirac = delta_operator(phi, epsilon)
 
@@ -367,10 +366,6 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         r_term = div(dps * phi_grad - phi_grad) + ndi.filters.laplace(phi)
         l_term = dirac * (sum(g_grad * normalized_phi_grad) + g * curvature)
         a_term = g * dirac
-
-        # quick_plot(r_term, 'r_term, normal')
-        # quick_plot(l_term, 'l_term, normal')
-        # quick_plot(a_term, 'a_term, normal')
 
         phi += delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
 
