@@ -20,7 +20,10 @@ def quick_plot(ndimage, title=""):
     img = ax.imshow(ndimage, interpolation='nearest', origin='bottom')
     plt.title(title)
     plt.colorbar(img, ax=ax)
-    plt.show(block=True)
+    figManager = plt.get_current_fig_manager()
+    figManager.window.showMaximized()
+    plt.show(block=False)
+    plt.pause(0.1)
 
 
 def check_seeds(seed_list):

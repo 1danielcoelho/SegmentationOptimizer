@@ -140,11 +140,11 @@ def test_level_sets():
     series_arr = bake_windowing(series_arr, min_value=1000, max_value=2000, scale=1000)
 
     level_set_params = {'alpha': -5.0, 'lamb': 1.0, 'mu': 0.1, 'sigma': 1.5, 'epsilon': 1.5, 'delta_t': 1.0}
-    phi = level_sets(series_arr, level_set_params,
-                     num_iter_to_update_plot=100, phi=None, max_iter=2000, plot=True, profile=True)
+    # phi = level_sets(series_arr, level_set_params,
+    #                  num_iter_to_update_plot=100, phi=None, max_iter=2000, plot=True, profile=True)
 
     phi = level_sets_nb(series_arr, level_set_params,
-                        num_iter_to_update_plot=100, phi=None, max_iter=2000, plot=True, profile=True)
+                        num_iter_to_update_plot=40, phi=None, max_iter=2000, plot=False, profile=True)
 
 
 def bake_windowing(series, min_value, max_value, scale):

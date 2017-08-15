@@ -229,18 +229,20 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         check_ndimage(image)
 
         if phi is None:
-            c = 10
+            c = 6
 
             phi = c * np.ones(image.shape, dtype=np.float64)
             middle = np.array(phi.shape) / 2.0
 
             phi[middle[0] - 10: middle[0] + 10, middle[1] - 10: middle[1] + 10] = -c
-            phi = fi.gaussian_filter(phi, 2)
+            phi = fi.gaussian_filter(phi, 4)
 
             phi[:, :2] = -c
             phi[:, -2:] = -c
             phi[:2, :] = -c
             phi[-2:, :] = -c
+
+            # quick_plot(phi, 'initial phi')
         else:
             check_ndimage(phi)
 
@@ -299,19 +301,17 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
     dps_2d = [np.zeros(shape=image.shape), np.zeros(shape=image.shape)]
 
     # Initialize the band
-    # Prepare narrowband mask, where True marks the narrowband spels
-    zero_crossing = get_band_indices_1d(phi, 50)
-    nb_indices = zero_crossing
-    nb_fringed_indices = zero_crossing
-    # nb_indices = dilate_band(zero_crossing, image.shape[1])
-    # nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
+    band_thickness = 3
+    zero_crossing = get_band_indices_1d(phi, band_thickness)
+    nb_indices = dilate_band(zero_crossing, image.shape[1])
+    nb_indices = dilate_band(nb_indices, image.shape[1])
+    nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
 
-    # testimg = np.zeros_like(image)
-    # testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
-    # testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
-    # testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
-    #
-    # quick_plot(testimg, 'initial nb')
+    testimg = np.zeros_like(image)
+    testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
+    testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
+    testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
+    quick_plot(testimg, 'band')
 
     for i in range(max_iter):
         # Make image edges well behaved
@@ -320,19 +320,19 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         nb_2d_indices = np.unravel_index(nb_indices, image.shape)
         nb_fringed_2d_indices = np.unravel_index(nb_fringed_indices, image.shape)
 
-        phi_grad_1d_yx = gradient_at_indices(phi, nb_fringed_indices) # ok
+        phi_grad_1d_yx = gradient_at_indices(phi, nb_fringed_indices)
 
         # TODO: Remove this once I find a better way of getting the laplacian for r_term
-        phi_grad_2d[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0]  # ok
-        phi_grad_2d[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1]  # ok
+        phi_grad_2d[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0]
+        phi_grad_2d[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1]
 
-        phi_grad_1d_mag = magnitude_of_gradient(phi_grad_1d_yx)  # ok
-        phi_grad_2d_norm[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0] / (phi_grad_1d_mag + 0.0000001)  # ok
-        phi_grad_2d_norm[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1] / (phi_grad_1d_mag + 0.0000001)  # ok
+        phi_grad_1d_mag = magnitude_of_gradient(phi_grad_1d_yx)
+        phi_grad_2d_norm[0][nb_fringed_2d_indices] = phi_grad_1d_yx[0] / (phi_grad_1d_mag + 0.0000001)
+        phi_grad_2d_norm[1][nb_fringed_2d_indices] = phi_grad_1d_yx[1] / (phi_grad_1d_mag + 0.0000001)
 
-        curvature_1d = div_at_indices(phi_grad_2d_norm, nb_indices)  # ok
+        curvature_1d = div_at_indices(phi_grad_2d_norm, nb_indices)
 
-        delta_1d = delta_operator(phi, epsilon, nb_indices)  # ok
+        delta_1d = delta_operator(phi, epsilon, nb_indices)
 
         # Compute stuff for distance regularization term
         a = (phi_grad_1d_mag >= 0.0) & (phi_grad_1d_mag <= 1.0)
@@ -348,27 +348,36 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
         # Maybe this laplace filter doesn't work?
         laplace = ndi.filters.laplace(phi)[nb_2d_indices]
 
-        r_term = div_at_indices(dps_2d, nb_indices) + laplace  # ok
+        r_term = div_at_indices(dps_2d, nb_indices) + laplace
         l_term = delta_1d * \
                  (g_grad[0].take(nb_indices) * phi_grad_2d_norm[0].take(nb_indices) +
                   g_grad[1].take(nb_indices) * phi_grad_2d_norm[1].take(nb_indices) +
-                  g_nb * curvature_1d)  # ok
-        a_term = g_nb * delta_1d  # ok
+                  g_nb * curvature_1d)
+        a_term = g_nb * delta_1d
 
         increment = delta_t * (mu * r_term + lamb * l_term + alpha * a_term)
 
         # This works
         phi[nb_2d_indices] += increment
 
-        zero_crossing = get_band_indices_1d(phi, 50)
-        nb_indices = zero_crossing
-        nb_fringed_indices = zero_crossing
+        # quick_plot(phi, 'phi')
 
         # testimg = np.zeros_like(image)
-        # testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
-        # testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
-        # testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
-        # quick_plot(testimg, 'initial nb iter ' + str(i))
+        # testimg[nb_2d_indices] = increment
+        # quick_plot(testimg, 'increment')
+
+        zero_crossing = get_band_indices_1d(phi, band_thickness)
+        nb_indices = dilate_band(zero_crossing, image.shape[1])
+        nb_indices = dilate_band(nb_indices, image.shape[1])
+        nb_fringed_indices = dilate_band(nb_indices, image.shape[1])
+
+        if (i+1) % num_iter_to_update_plot == 0:
+            testimg = np.zeros_like(image)
+            testimg[np.unravel_index(nb_fringed_indices, dims=image.shape)] = 1
+            testimg[np.unravel_index(nb_indices, dims=image.shape)] = 2
+            testimg[np.unravel_index(zero_crossing, dims=image.shape)] = 3
+            quick_plot(testimg, 'band')
+            # quick_plot(phi, 'phi')
 
         if plot and (i+1) % num_iter_to_update_plot == 0:
             if phi.ndim == 2:
@@ -395,7 +404,8 @@ def level_sets(image, params, phi=None, max_iter=10000, num_iter_to_update_plot=
 
     # Keep plot open when the algorithm finishes
     if plot:
-        plt.show(block=True)
+        pass
+    plt.show(block=True)
 
     return phi
 
